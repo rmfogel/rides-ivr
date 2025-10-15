@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import twilio from 'twilio';
 import { say } from '../utils/twiml.js';
+import { playPrompt } from '../utils/recordings.js';
 import { getSession, patchSession } from '../store/session.js';
 import { getActiveOffersByDriverPhone, getActiveRequestsByRiderPhone, cancelOffer, cancelRequest } from '../db/repo.js';
 import { formatRideDetails } from '../utils/formatting.js';
@@ -35,7 +36,7 @@ manageRouter.post('/list-rides', async (req, res) => {
               session.data.selectedRide = ride;
               patchSession(callSid, { step: 'manage_confirm_cancel', data: session.data });
               const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 8, action: '/voice/manage/confirm-cancel' });
-              say(g, `Are you sure you want to cancel this ride: ${formatRideDetails(ride, true)}? Press 1 to confirm cancellation. Press 2 to return.`);
+              playPrompt(g, 'press_1_confirm_2_restart');
               return res.type('text/xml').send(twiml.toString());
             }
           } else {
@@ -44,7 +45,7 @@ manageRouter.post('/list-rides', async (req, res) => {
               session.data.selectedRide = ride;
               patchSession(callSid, { step: 'manage_confirm_cancel', data: session.data });
               const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 8, action: '/voice/manage/confirm-cancel' });
-              say(g, `Are you sure you want to cancel this ride request: ${formatRideDetails(ride, false)}? Press 1 to confirm cancellation. Press 2 to return.`);
+              playPrompt(g, 'press_1_confirm_2_restart');
               return res.type('text/xml').send(twiml.toString());
             }
           }
@@ -57,7 +58,7 @@ manageRouter.post('/list-rides', async (req, res) => {
             patchSession(callSid, { step: 'manage_duplicate_date', data: session.data });
             const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate-date' });
             const isOffer = session.data.duplicateType === 'driver';
-            say(g, `You are duplicating this ${isOffer ? 'ride' : 'request'}: ${formatRideDetails(lastRide, isOffer)}. To proceed press 1, to return press 9.`);
+            playPrompt(g, 'press_1_confirm_2_restart');
             return res.type('text/xml').send(twiml.toString());
           }
         }
@@ -80,7 +81,7 @@ manageRouter.post('/list-rides', async (req, res) => {
     if (isCancel) {
       const items = session.data.cancelType === 'driver' ? session.data.offers : session.data.requests;
       if (!items || index >= items.length) {
-        say(twiml, 'No rides available.');
+  playPrompt(twiml, 'info_not_available');
         patchSession(callSid, { step: 'manage_main_menu', data: session.data });
         twiml.redirect('/voice/manage');
         return res.type('text/xml').send(twiml.toString());
@@ -89,14 +90,14 @@ manageRouter.post('/list-rides', async (req, res) => {
       const ride = items[index];
       const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 8, action: '/voice/manage/list-rides' });
       const isOffer = session.data.cancelType === 'driver';
-      say(g, `Ride ${index + 1} of ${items.length}: ${formatRideDetails(ride, isOffer)}. Press 1 to select this ride. Press 2 for the next ride. Press 9 to return.`);
+  playPrompt(g, 'press_1_confirm_2_restart');
     }
     
     // If we're listing rides for duplication, similar logic would go here
     
   } catch (error) {
     console.error('Error in list-rides flow:', error);
-    say(twiml, 'Sorry, there was an error processing your request. Please try again later.');
+  playPrompt(twiml, 'error_generic_try_later');
     twiml.redirect('/voice/manage');
   }
   
@@ -122,10 +123,10 @@ manageRouter.post('/confirm-cancel', async (req, res) => {
       
       if (isOffer) {
         await cancelOffer(ride.id);
-        say(twiml, 'Your ride has been cancelled. Any pending matches have been notified.');
+  playPrompt(twiml, 'thanks_goodbye');
       } else {
         await cancelRequest(ride.id);
-        say(twiml, 'Your ride request has been cancelled.');
+  playPrompt(twiml, 'thanks_goodbye');
       }
       
       patchSession(callSid, { step: 'manage_main_menu', data: session.data });
@@ -137,7 +138,7 @@ manageRouter.post('/confirm-cancel', async (req, res) => {
     }
   } catch (error) {
     console.error('Error in confirm-cancel flow:', error);
-    say(twiml, 'Sorry, there was an error cancelling your ride. Please try again later.');
+  playPrompt(twiml, 'error_generic_try_later');
     patchSession(callSid, { step: 'manage_main_menu', data: session.data });
     twiml.redirect('/voice/manage');
   }

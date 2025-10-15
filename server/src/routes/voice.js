@@ -15,8 +15,9 @@ import {
 import { matchNewOffer, matchNewRequest } from '../engine/matching.js';
 import { DateTime } from 'luxon';
 import { TZ } from '../utils/time.js';
-import { say, gatherDigits, hangup, sayDigits } from '../utils/twiml.js';
+import { say, gatherDigits, hangup } from '../utils/twiml.js';
 import { audioUrl, HE_PROMPTS } from '../utils/media.js';
+import { playPrompt } from '../utils/recordings.js';
 import logger from '../utils/logger.js';
 import { DEFAULT_LANGUAGE, LANGUAGES, TRANSLATIONS, getText } from '../config/language.js';
 
@@ -41,7 +42,7 @@ voiceRouter.post('/incoming', async (req, res) => {
   // Set session language based on query param if provided, default to English
   const language = req.query.lang || DEFAULT_LANGUAGE;
   const isHebrew = language === 'he';
-  const useRecorded = isHebrew && (process.env.USE_RECORDED_HE || '').toLowerCase() === 'true';
+  const useRecorded = true; // switched to use recordings everywhere
   
   // Store language preference in session for future requests
   if (!req.session) {
@@ -60,7 +61,7 @@ voiceRouter.post('/incoming', async (req, res) => {
   
   // Use recorded audio for Hebrew if the feature flag is enabled; otherwise fallback to TTS
   if (useRecorded) {
-    twiml.play(audioUrl(HE_PROMPTS.welcome));
+    playPrompt(twiml, 'welcome');
   } else {
     const welcomeText = getText('welcome', language);
     say(twiml, welcomeText, isHebrew);
@@ -72,12 +73,16 @@ voiceRouter.post('/incoming', async (req, res) => {
     action: `/voice/menu?lang=${language}`
   });
   if (useRecorded) {
-    twiml.play(audioUrl(HE_PROMPTS.mainMenu));
+    playPrompt(gather, 'main_menu');
   } else {
     const menuText = getText('mainMenu', language);
     say(gather, menuText, isHebrew);
   }
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  if (useRecorded) {
+    playPrompt(twiml, 'no_input_goodbye');
+  } else {
+    playPrompt(twiml, 'no_input_goodbye');
+  }
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
 });
@@ -102,8 +107,7 @@ voiceRouter.post('/menu', (req, res) => {
   } else if (Digits === '3') {
     twiml.redirect(`/voice/manage?lang=${language}`);
   } else {
-    const invalidText = getText('invalidInput', language);
-    say(twiml, invalidText, isHebrew);
+    playPrompt(twiml, 'invalid_input');
     twiml.hangup();
   }
   res.type('text/xml').send(twiml.toString());
@@ -118,8 +122,8 @@ voiceRouter.post('/rider', (req, res) => {
     timeout: 6,
     action: '/voice/rider-action'
   });
-  gather.say({ voice: 'alice' }, 'Rider menu. For new ride press 1. For status press 2. To duplicate a ride press 3.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'main_menu');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
 });
@@ -133,7 +137,7 @@ voiceRouter.post('/rider-action', (req, res) => {
     // Redirect to new ride flow - simplified for demo
     twiml.redirect('/voice/rider-new');
   } else {
-    twiml.say({ voice: 'alice' }, 'This feature is not yet implemented.');
+    playPrompt(twiml, 'not_implemented');
     twiml.hangup();
   }
   
@@ -150,15 +154,15 @@ voiceRouter.post('/rider-new', (req, res) => {
   req.session.phone = from;
   
   // Step 1: Ask for direction
-  twiml.say({ voice: 'alice' }, 'Let\'s create a new ride request.');
+  playPrompt(twiml, 'start_rider_request');
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 6,
     action: '/voice/rider-direction'
   });
-  gather.say({ voice: 'alice' }, 'For a ride from the settlement press 1. For a ride to the settlement press 2.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'direction_prompt');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -178,7 +182,7 @@ voiceRouter.post('/rider-direction', (req, res) => {
     req.session.direction = 'TO';
     twiml.redirect('/voice/rider-date');
   } else {
-    twiml.say({ voice: 'alice' }, 'Invalid input.');
+    playPrompt(twiml, 'invalid_input');
     twiml.redirect('/voice/rider-new');
   }
   
@@ -195,8 +199,8 @@ voiceRouter.post('/rider-date', (req, res) => {
     timeout: 6,
     action: '/voice/rider-date-choice'
   });
-  gather.say({ voice: 'alice' }, 'For today press 1. For tomorrow press 2. For another date press 3.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'date_choice_prompt');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -216,8 +220,8 @@ voiceRouter.post('/rider-date-choice', (req, res) => {
       req.session.rideDate = date.toISODate();
       twiml.redirect('/voice/rider-time');
     } catch (error) {
-      console.error('Error setting date:', error);
-      twiml.say({ voice: 'alice' }, 'There was an error processing the date. Let\'s try again.');
+  console.error('Error setting date:', error);
+  playPrompt(twiml, 'invalid_date_try_again');
       twiml.redirect('/voice/rider-date');
     }
   } else if (Digits === '3') {
@@ -228,11 +232,11 @@ voiceRouter.post('/rider-date-choice', (req, res) => {
       timeout: 15,
       action: '/voice/rider-custom-date'
     });
-    gather.say({ voice: 'alice' }, 'Please enter the date in format day-month-year, like 150925 for September 15, 2025.');
-    twiml.say({ voice: 'alice' }, 'No input detected. Let\'s try again.');
+    playPrompt(gather, 'enter_date_six_digits');
+    playPrompt(twiml, 'invalid_date_try_again');
     twiml.redirect('/voice/rider-date');
   } else {
-    twiml.say({ voice: 'alice' }, 'Invalid input.');
+    playPrompt(twiml, 'invalid_input');
     twiml.redirect('/voice/rider-date');
   }
   
@@ -259,8 +263,8 @@ voiceRouter.post('/rider-custom-date', (req, res) => {
     req.session.rideDate = date.toISODate();
     twiml.redirect('/voice/rider-time');
   } catch (error) {
-    console.error('Error processing custom date:', error);
-    twiml.say({ voice: 'alice' }, 'Invalid date format. Let\'s try again.');
+  console.error('Error processing custom date:', error);
+  playPrompt(twiml, 'invalid_date_try_again');
     twiml.redirect('/voice/rider-date');
   }
   
@@ -277,8 +281,8 @@ voiceRouter.post('/rider-time', (req, res) => {
     timeout: 15,
     action: '/voice/rider-earliest-time'
   });
-  gather.say({ voice: 'alice' }, 'Please enter the earliest time you want to travel in 24-hour format. For example, for 3:30 PM, enter 1530.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'time_enter_earliest');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -309,12 +313,12 @@ voiceRouter.post('/rider-earliest-time', (req, res) => {
       timeout: 15,
       action: '/voice/rider-latest-time'
     });
-    gather.say({ voice: 'alice' }, 'Please enter the latest time you want to travel in 24-hour format. For example, for 4:30 PM, enter 1630.');
-    twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+    playPrompt(gather, 'time_enter_latest');
+    playPrompt(twiml, 'no_input_goodbye');
     twiml.hangup();
   } catch (error) {
-    console.error('Error processing earliest time:', error);
-    twiml.say({ voice: 'alice' }, 'Invalid time format. Let\'s try again.');
+  console.error('Error processing earliest time:', error);
+  playPrompt(twiml, 'invalid_time_try_again');
     twiml.redirect('/voice/rider-time');
   }
   
@@ -354,14 +358,12 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
       timeout: 10,
       action: '/voice/rider-preferred-time'
     });
-    gather.say({ voice: 'alice' }, 'Do you have a preferred time within this range? Press 1 for yes or 2 for no.');
-    twiml.say({ voice: 'alice' }, 'No input detected. Continuing without preferred time.');
+    playPrompt(gather, 'preferred_time_question');
+    playPrompt(twiml, 'continue_without_preferred');
     twiml.redirect('/voice/rider-passengers');
   } catch (error) {
     console.error('Error processing latest time:', error);
-    twiml.say({ voice: 'alice' }, error.message === 'Latest time must be after earliest time' ? 
-      'The latest time must be after the earliest time. Let\'s try again.' : 
-      'Invalid time format. Let\'s try again.');
+    playPrompt(twiml, 'invalid_time_try_again');
     twiml.redirect('/voice/rider-time');
   }
   
@@ -382,8 +384,8 @@ voiceRouter.post('/rider-preferred-time', (req, res) => {
       timeout: 15,
       action: '/voice/rider-preferred-time-entry'
     });
-    gather.say({ voice: 'alice' }, 'Please enter your preferred time in 24-hour format. For example, for 4:00 PM, enter 1600.');
-    twiml.say({ voice: 'alice' }, 'No input detected. Continuing without preferred time.');
+    playPrompt(gather, 'preferred_time_enter');
+    playPrompt(twiml, 'continue_without_preferred');
     twiml.redirect('/voice/rider-passengers');
   } else {
     // No preferred time or chose not to enter one
@@ -427,11 +429,8 @@ voiceRouter.post('/rider-preferred-time-entry', (req, res) => {
     twiml.redirect('/voice/rider-passengers');
   } catch (error) {
     console.error('Error processing preferred time:', error);
-    if (error.message === 'Preferred time must be within the time range') {
-      twiml.say({ voice: 'alice' }, 'The preferred time must be within the earliest and latest time range. Let\'s continue without a preferred time.');
-    } else {
-      twiml.say({ voice: 'alice' }, 'Invalid time format. Let\'s continue without a preferred time.');
-    }
+    // In recordings mode, play a generic continuation prompt
+    playPrompt(twiml, 'continue_without_preferred');
     twiml.redirect('/voice/rider-passengers');
   }
   
@@ -448,8 +447,9 @@ voiceRouter.post('/rider-passengers', (req, res) => {
     timeout: 10,
     action: '/voice/rider-male-count'
   });
-  gather.say({ voice: 'alice' }, 'Let\'s enter passenger details. How many male passengers? Press 0 to 9.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'passenger_details_intro');
+  playPrompt(gather, 'how_many_males');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -471,8 +471,8 @@ voiceRouter.post('/rider-male-count', (req, res) => {
     timeout: 10,
     action: '/voice/rider-female-count'
   });
-  gather.say({ voice: 'alice' }, 'How many female passengers? Press 0 to 9.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'how_many_females');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -492,7 +492,7 @@ voiceRouter.post('/rider-female-count', (req, res) => {
   const totalCount = req.session.maleCount + femaleCount;
   
   if (totalCount === 0) {
-    twiml.say({ voice: 'alice' }, 'You must have at least one passenger. Let\'s try again.');
+    playPrompt(twiml, 'need_at_least_one_passenger');
     twiml.redirect('/voice/rider-passengers');
   } else if (totalCount >= 2) {
     const gather = twiml.gather({
@@ -501,8 +501,8 @@ voiceRouter.post('/rider-female-count', (req, res) => {
       timeout: 10,
       action: '/voice/rider-couples-count'
     });
-    gather.say({ voice: 'alice' }, `How many couples are in your group of ${totalCount} passengers? Press 0 to ${Math.floor(totalCount / 2)}.`);
-    twiml.say({ voice: 'alice' }, 'No input detected. Assuming no couples.');
+    playPrompt(gather, 'couples_how_many');
+    playPrompt(twiml, 'continue_without_preferred');
     twiml.redirect('/voice/rider-together');
   } else {
     // Only one passenger, no couples
@@ -525,15 +525,15 @@ voiceRouter.post('/rider-couples-count', (req, res) => {
   
   // Validate couples count
   if (couplesCount * 2 > totalCount) {
-    twiml.say({ voice: 'alice' }, `Too many couples specified for ${totalCount} passengers. Let's try again.`);
+    playPrompt(twiml, 'too_many_couples');
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
       action: '/voice/rider-couples-count'
     });
-    gather.say({ voice: 'alice' }, `How many couples are in your group of ${totalCount} passengers? Press 0 to ${Math.floor(totalCount / 2)}.`);
-    twiml.say({ voice: 'alice' }, 'No input detected. Assuming no couples.');
+    playPrompt(gather, 'couples_how_many');
+    playPrompt(twiml, 'continue_without_preferred');
     twiml.redirect('/voice/rider-together');
   } else {
     req.session.couplesCount = couplesCount;
@@ -557,8 +557,8 @@ voiceRouter.post('/rider-together', (req, res) => {
       timeout: 10,
       action: '/voice/rider-confirm'
     });
-    gather.say({ voice: 'alice' }, 'Must all passengers travel together? Press 1 for yes or 2 for no.');
-    twiml.say({ voice: 'alice' }, 'No input detected. Assuming passengers must travel together.');
+  playPrompt(gather, 'together_question');
+  playPrompt(twiml, 'assuming_together');
     
     // Default to together if no input
     req.session.together = true;
@@ -600,7 +600,7 @@ voiceRouter.post('/rider-confirm', (req, res) => {
   const passengersStr = `${totalCount} passenger${totalCount > 1 ? 's' : ''}: ${req.session.maleCount} male, ${req.session.femaleCount} female, including ${req.session.couplesCount} couple${req.session.couplesCount !== 1 ? 's' : ''}`;
   const togetherStr = req.session.together ? 'Passengers must travel together' : 'Passengers can travel separately';
   
-  twiml.say({ voice: 'alice' }, `Please confirm your ride request: ${dateStr}, between ${earlyTime} and ${lateTime}${preferredTimeStr}, ${directionStr}. ${passengersStr}. ${togetherStr}.`);
+  playPrompt(twiml, 'confirm_request_intro');
   
   const gather = twiml.gather({
     input: 'dtmf',
@@ -608,8 +608,8 @@ voiceRouter.post('/rider-confirm', (req, res) => {
     timeout: 10,
     action: '/voice/rider-submit'
   });
-  gather.say({ voice: 'alice' }, 'Press 1 to confirm and submit this request or 2 to start over.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'press_1_confirm_2_restart');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -697,11 +697,18 @@ voiceRouter.post('/rider-submit', async (req, res) => {
         const timeStr = departureTime.toFormat('HH:mm');
         
         // Tell the rider about the match
-        twiml.say({ voice: 'alice' }, `Great news! We found a ride for you with ${driverInfo} at ${timeStr}.`);
-        
+        playPrompt(twiml, 'great_news_found_ride');
         // Read out the phone number digit by digit
-        twiml.say({ voice: 'alice' }, 'The driver\'s phone number is:');
-        sayDigits(twiml, driverPhone);
+        playPrompt(twiml, 'driver_phone_number_is');
+        // Play driver phone digits
+        {
+          // use recordings digit-by-digit
+          const s = String(driverPhone || '');
+          for (const ch of s) {
+            if (ch === '+') playPrompt(twiml, 'plus');
+            else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+          }
+        }
         
         // Ask if they want this ride
         const gather = twiml.gather({
@@ -710,22 +717,21 @@ voiceRouter.post('/rider-submit', async (req, res) => {
           timeout: 10,
           action: `/voice/rider-confirm-match?match_id=${bestMatch.id}&offer_id=${matchedOffer.id}`
         });
-        gather.say({ voice: 'alice' }, 'Press 1 to accept this ride or 2 to decline.');
-        
-        twiml.say({ voice: 'alice' }, 'No input received. We will keep your ride request active. Goodbye.');
+        playPrompt(gather, 'press_1_accept_2_decline');
+        playPrompt(twiml, 'request_registered_keep_active');
         twiml.hangup();
       } else {
-        twiml.say({ voice: 'alice' }, 'Your ride request has been registered. We will notify you when a matching ride is found.');
-        twiml.say({ voice: 'alice' }, 'Thank you for using our service. Goodbye.');
+        playPrompt(twiml, 'request_registered');
+        playPrompt(twiml, 'thanks_goodbye');
         twiml.hangup();
       }
     } catch (error) {
       console.error('Error creating ride request:', error);
-      twiml.say({ voice: 'alice' }, 'Sorry, there was an error processing your request. Please try again later.');
+      playPrompt(twiml, 'error_generic_try_later');
       twiml.hangup();
     }
   } else {
-    twiml.say({ voice: 'alice' }, 'Let\'s start over.');
+    playPrompt(twiml, 'start_over');
     twiml.redirect('/voice/rider-new');
   }
   
@@ -741,8 +747,8 @@ voiceRouter.post('/driver', (req, res) => {
     timeout: 6,
     action: '/voice/driver-action'
   });
-  gather.say({ voice: 'alice' }, 'Driver menu. For new ride offer press 1. For status press 2.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'driver_menu');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
 });
@@ -756,7 +762,7 @@ voiceRouter.post('/driver-action', (req, res) => {
     // Redirect to new ride offer flow - simplified for demo
     twiml.redirect('/voice/driver-new');
   } else {
-    twiml.say({ voice: 'alice' }, 'This feature is not yet implemented.');
+    playPrompt(twiml, 'not_implemented');
     twiml.hangup();
   }
   
@@ -773,15 +779,15 @@ voiceRouter.post('/driver-new', (req, res) => {
   req.session.phone = from;
   
   // Step 1: Ask for direction
-  twiml.say({ voice: 'alice' }, 'Let\'s create a new ride offer.');
+  playPrompt(twiml, 'start_driver_offer');
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 6,
     action: '/voice/driver-direction'
   });
-  gather.say({ voice: 'alice' }, 'For a ride from the settlement press 1. For a ride to the settlement press 2.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'direction_prompt');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -801,7 +807,7 @@ voiceRouter.post('/driver-direction', (req, res) => {
     req.session.direction = 'TO';
     twiml.redirect('/voice/driver-date');
   } else {
-    twiml.say({ voice: 'alice' }, 'Invalid input.');
+    playPrompt(twiml, 'invalid_input');
     twiml.redirect('/voice/driver-new');
   }
   
@@ -818,8 +824,8 @@ voiceRouter.post('/driver-date', (req, res) => {
     timeout: 6,
     action: '/voice/driver-date-choice'
   });
-  gather.say({ voice: 'alice' }, 'For today press 1. For tomorrow press 2. For another date press 3.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'date_choice_prompt');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -839,8 +845,8 @@ voiceRouter.post('/driver-date-choice', (req, res) => {
       req.session.rideDate = date.toISODate();
       twiml.redirect('/voice/driver-time');
     } catch (error) {
-      console.error('Error setting date:', error);
-      twiml.say({ voice: 'alice' }, 'There was an error processing the date. Let\'s try again.');
+  console.error('Error setting date:', error);
+  playPrompt(twiml, 'invalid_date_try_again');
       twiml.redirect('/voice/driver-date');
     }
   } else if (Digits === '3') {
@@ -851,11 +857,11 @@ voiceRouter.post('/driver-date-choice', (req, res) => {
       timeout: 15,
       action: '/voice/driver-custom-date'
     });
-    gather.say({ voice: 'alice' }, 'Please enter the date in format day-month-year, like 150925 for September 15, 2025.');
-    twiml.say({ voice: 'alice' }, 'No input detected. Let\'s try again.');
+    playPrompt(gather, 'enter_date_six_digits');
+    playPrompt(twiml, 'invalid_date_try_again');
     twiml.redirect('/voice/driver-date');
   } else {
-    twiml.say({ voice: 'alice' }, 'Invalid input.');
+    playPrompt(twiml, 'invalid_input');
     twiml.redirect('/voice/driver-date');
   }
   
@@ -882,8 +888,8 @@ voiceRouter.post('/driver-custom-date', (req, res) => {
     req.session.rideDate = date.toISODate();
     twiml.redirect('/voice/driver-time');
   } catch (error) {
-    console.error('Error processing custom date:', error);
-    twiml.say({ voice: 'alice' }, 'Invalid date format. Let\'s try again.');
+  console.error('Error processing custom date:', error);
+  playPrompt(twiml, 'invalid_date_try_again');
     twiml.redirect('/voice/driver-date');
   }
   
@@ -900,8 +906,8 @@ voiceRouter.post('/driver-time', (req, res) => {
     timeout: 15,
     action: '/voice/driver-departure-time'
   });
-  gather.say({ voice: 'alice' }, 'Please enter your departure time in 24-hour format. For example, for 3:30 PM, enter 1530.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'time_enter_departure');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -927,8 +933,8 @@ voiceRouter.post('/driver-departure-time', (req, res) => {
     req.session.departureTime = { hours, minutes };
     twiml.redirect('/voice/driver-seats');
   } catch (error) {
-    console.error('Error processing departure time:', error);
-    twiml.say({ voice: 'alice' }, 'Invalid time format. Let\'s try again.');
+  console.error('Error processing departure time:', error);
+  playPrompt(twiml, 'invalid_time_try_again');
     twiml.redirect('/voice/driver-time');
   }
   
@@ -945,8 +951,9 @@ voiceRouter.post('/driver-seats', (req, res) => {
     timeout: 10,
     action: '/voice/driver-male-seats'
   });
-  gather.say({ voice: 'alice' }, 'Let\'s enter seat availability. How many seats for male passengers only? Press 0 to 9.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'passenger_details_intro');
+  playPrompt(gather, 'how_many_males');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -968,8 +975,8 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
     timeout: 10,
     action: '/voice/driver-female-seats'
   });
-  gather.say({ voice: 'alice' }, 'How many seats for female passengers only? Press 0 to 9.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'how_many_females');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -991,8 +998,8 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
     timeout: 10,
     action: '/voice/driver-unisex-seats'
   });
-  gather.say({ voice: 'alice' }, 'How many seats for any passengers (unisex)? Press 0 to 9.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'seats');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -1012,7 +1019,7 @@ voiceRouter.post('/driver-unisex-seats', (req, res) => {
   const totalSeats = req.session.maleOnlySeats + req.session.femaleOnlySeats + unisexSeats;
   
   if (totalSeats === 0) {
-    twiml.say({ voice: 'alice' }, 'You must offer at least one seat. Let\'s try again.');
+    playPrompt(twiml, 'need_at_least_one_passenger');
     twiml.redirect('/voice/driver-seats');
   } else {
     twiml.redirect('/voice/driver-confirm');
@@ -1036,7 +1043,7 @@ voiceRouter.post('/driver-confirm', (req, res) => {
   const totalSeats = req.session.maleOnlySeats + req.session.femaleOnlySeats + req.session.unisexSeats;
   const seatsStr = `${totalSeats} total seat${totalSeats > 1 ? 's' : ''}: ${req.session.maleOnlySeats} for males only, ${req.session.femaleOnlySeats} for females only, and ${req.session.unisexSeats} unisex seats`;
   
-  twiml.say({ voice: 'alice' }, `Please confirm your ride offer: ${dateStr}, departing at ${departureTime}, ${directionStr}. Offering ${seatsStr}.`);
+  playPrompt(twiml, 'confirm_request_intro');
   
   const gather = twiml.gather({
     input: 'dtmf',
@@ -1044,8 +1051,8 @@ voiceRouter.post('/driver-confirm', (req, res) => {
     timeout: 10,
     action: '/voice/driver-submit'
   });
-  gather.say({ voice: 'alice' }, 'Press 1 to confirm and submit this offer or 2 to start over.');
-  twiml.say({ voice: 'alice' }, 'No input detected. Goodbye.');
+  playPrompt(gather, 'press_1_confirm_2_restart');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
@@ -1113,11 +1120,16 @@ voiceRouter.post('/driver-submit', async (req, res) => {
           ((matchedRequest.passengers_male || 0) + (matchedRequest.passengers_female || 0));
         
         // Tell the driver about the match
-        twiml.say({ voice: 'alice' }, `Great news! We found a passenger for your ride. ${riderInfo} needs a ride with ${totalPassengers} ${totalPassengers === 1 ? 'passenger' : 'passengers'} at ${preferredTime}.`);
-        
+        playPrompt(twiml, 'great_news_found_ride');
         // Read out the phone number digit by digit
-        twiml.say({ voice: 'alice' }, 'The passenger\'s phone number is:');
-        sayDigits(twiml, riderPhone);
+        playPrompt(twiml, 'passenger_phone_number_is');
+        {
+          const s = String(riderPhone || '');
+          for (const ch of s) {
+            if (ch === '+') playPrompt(twiml, 'plus');
+            else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+          }
+        }
         
         // Ask if they want to take this passenger
         const gather = twiml.gather({
@@ -1126,22 +1138,21 @@ voiceRouter.post('/driver-submit', async (req, res) => {
           timeout: 10,
           action: `/voice/driver-confirm-match?match_id=${bestMatch.id}&request_id=${matchedRequest.id}`
         });
-        gather.say({ voice: 'alice' }, 'Press 1 to accept this passenger or 2 to decline.');
-        
-        twiml.say({ voice: 'alice' }, 'No input received. We will keep your ride offer active. Goodbye.');
+        playPrompt(gather, 'press_1_accept_2_decline');
+        playPrompt(twiml, 'offer_registered_keep_active');
         twiml.hangup();
       } else {
-        twiml.say({ voice: 'alice' }, 'Your ride offer has been registered. We will notify you when matching requests are found.');
-        twiml.say({ voice: 'alice' }, 'Thank you for using our service. Goodbye.');
+        playPrompt(twiml, 'request_registered');
+        playPrompt(twiml, 'thanks_goodbye');
         twiml.hangup();
       }
     } catch (error) {
       console.error('Error creating ride offer:', error);
-      twiml.say({ voice: 'alice' }, 'Sorry, there was an error processing your offer. Please try again later.');
+      playPrompt(twiml, 'error_generic_try_later');
       twiml.hangup();
     }
   } else {
-    twiml.say({ voice: 'alice' }, 'Let\'s start over.');
+    playPrompt(twiml, 'start_over');
     twiml.redirect('/voice/driver-new');
   }
   
@@ -1165,20 +1176,22 @@ voiceRouter.post('/rider-confirm-match', async (req, res) => {
       const departureTime = DateTime.fromJSDate(offer.departure_time).setZone(TZ);
       const timeStr = departureTime.toFormat('HH:mm');
       
-      twiml.say({ voice: 'alice' }, `You have accepted the ride at ${timeStr}.`);
-      twiml.say({ voice: 'alice' }, 'The driver will be notified. Remember to be ready on time.');
-      
-      // Remind them of the driver's phone number
-      twiml.say({ voice: 'alice' }, 'The driver\'s phone number is:');
-      sayDigits(twiml, offer.driver_phone);
-      
-      twiml.say({ voice: 'alice' }, 'Thank you for using our service. Goodbye.');
+      playPrompt(twiml, 'rider_accepted');
+      playPrompt(twiml, 'driver_phone_number_is');
+      {
+        const s = String(offer.driver_phone || '');
+        for (const ch of s) {
+          if (ch === '+') playPrompt(twiml, 'plus');
+          else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+        }
+      }
+      playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (Digits === '2') {
       // Rider declined the match
       await updateMatchStatus(matchId, 'declined');
-      twiml.say({ voice: 'alice' }, 'You have declined this ride. Your ride request will remain active in our system.');
-      twiml.say({ voice: 'alice' }, 'Thank you for using our service. Goodbye.');
+  playPrompt(twiml, 'rider_declined');
+  playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (Digits === '3') {
       // Rider wants to hear the driver's phone number
@@ -1186,17 +1199,17 @@ voiceRouter.post('/rider-confirm-match', async (req, res) => {
       if (offer) {
         twiml.redirect(`/voice/ringback-hear-phone?phone=${encodeURIComponent(offer.driver_phone)}&type=driver`);
       } else {
-        twiml.say({ voice: 'alice' }, 'Sorry, we couldn\'t retrieve the driver\'s information. Please try again later.');
+  playPrompt(twiml, 'info_not_available');
         twiml.hangup();
       }
     } else {
       // Invalid input
-      twiml.say({ voice: 'alice' }, 'Invalid selection. Goodbye.');
+  playPrompt(twiml, 'invalid_input');
       twiml.hangup();
     }
   } catch (error) {
-    console.error('Error handling match confirmation:', error);
-    twiml.say({ voice: 'alice' }, 'Sorry, there was an error processing your response. Please try again later.');
+  console.error('Error handling match confirmation:', error);
+  playPrompt(twiml, 'error_generic_try_later');
     twiml.hangup();
   }
   
@@ -1229,20 +1242,22 @@ voiceRouter.post('/driver-confirm-match', async (req, res) => {
         timeInfo = ` between ${earliestTime.toFormat('HH:mm')} and ${latestTime.toFormat('HH:mm')}`;
       }
       
-      twiml.say({ voice: 'alice' }, `You have accepted the passenger${timeInfo}.`);
-      twiml.say({ voice: 'alice' }, 'The passenger will be notified.');
-      
-      // Remind them of the passenger's phone number
-      twiml.say({ voice: 'alice' }, 'The passenger\'s phone number is:');
-      sayDigits(twiml, request.rider_phone);
-      
-      twiml.say({ voice: 'alice' }, 'Thank you for using our service. Goodbye.');
+      playPrompt(twiml, 'driver_accepted');
+      playPrompt(twiml, 'passenger_phone_number_is');
+      {
+        const s = String(request.rider_phone || '');
+        for (const ch of s) {
+          if (ch === '+') playPrompt(twiml, 'plus');
+          else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+        }
+      }
+      playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (Digits === '2') {
       // Driver declined the match
       await updateMatchStatus(matchId, 'declined');
-      twiml.say({ voice: 'alice' }, 'You have declined this passenger. Your ride offer will remain active in our system.');
-      twiml.say({ voice: 'alice' }, 'Thank you for using our service. Goodbye.');
+  playPrompt(twiml, 'driver_declined');
+  playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (Digits === '3') {
       // Driver wants to hear the passenger's phone number
@@ -1250,17 +1265,17 @@ voiceRouter.post('/driver-confirm-match', async (req, res) => {
       if (request) {
         twiml.redirect(`/voice/ringback-hear-phone?phone=${encodeURIComponent(request.rider_phone)}&type=passenger`);
       } else {
-        twiml.say({ voice: 'alice' }, 'Sorry, we couldn\'t retrieve the passenger\'s information. Please try again later.');
+  playPrompt(twiml, 'info_not_available');
         twiml.hangup();
       }
     } else {
       // Invalid input
-      twiml.say({ voice: 'alice' }, 'Invalid selection. Goodbye.');
+  playPrompt(twiml, 'invalid_input');
       twiml.hangup();
     }
   } catch (error) {
-    console.error('Error handling match confirmation:', error);
-    twiml.say({ voice: 'alice' }, 'Sorry, there was an error processing your response. Please try again later.');
+  console.error('Error handling match confirmation:', error);
+  playPrompt(twiml, 'error_generic_try_later');
     twiml.hangup();
   }
   
@@ -1292,11 +1307,8 @@ voiceRouter.post('/ringback-start', async (req, res) => {
       phone
     });
     // This is a voicemail - leave a brief message
-    if (isRider) {
-      twiml.say({ voice: 'alice' }, 'Hello, this is the ride service. A matching ride has been found for your request. Please call back to get details. Thank you.');
-    } else {
-      twiml.say({ voice: 'alice' }, 'Hello, this is the ride service. A passenger has been matched to your ride offer. Please call back to get details. Thank you.');
-    }
+    // Leave a minimal voicemail
+    playPrompt(twiml, 'great_news_found_ride');
     twiml.hangup();
     res.type('text/xml').send(twiml.toString());
     return;
@@ -1329,7 +1341,7 @@ voiceRouter.post('/ringback-start', async (req, res) => {
           const timeStr = departureTime.toFormat('HH:mm');
           
           // Tell the rider about the match
-          twiml.say({ voice: 'alice' }, `Hello, this is the ride service. We found a ride for you with ${driverInfo} at ${timeStr}.`);
+          playPrompt(twiml, 'great_news_found_ride');
           
           // Offer options
           const gather = twiml.gather({
@@ -1339,13 +1351,13 @@ voiceRouter.post('/ringback-start', async (req, res) => {
             action: `/voice/rider-confirm-match?match_id=${match.id}&offer_id=${offer.id}`
           });
           
-          gather.say({ voice: 'alice' }, 'Press 1 to accept this ride, 2 to decline, or 3 to hear the driver\'s phone number.');
-          twiml.say({ voice: 'alice' }, 'No input received. Please call back later if you\'re interested in this ride. Goodbye.');
+          playPrompt(gather, 'press_1_accept_2_decline_3_hear_phone');
+          playPrompt(twiml, 'thanks_goodbye');
         } else {
-          twiml.say({ voice: 'alice' }, 'Hello, this is the ride service. We found a matching ride for your request, but we\'re having trouble retrieving the details. Please call back later. Thank you.');
+          playPrompt(twiml, 'info_not_available');
         }
       } else {
-        twiml.say({ voice: 'alice' }, 'Hello, this is the ride service. We called to inform you about a ride match, but it seems the information is no longer available. Please call back for details. Thank you.');
+        playPrompt(twiml, 'info_not_available');
       }
     } else {
       // Driver callback flow
@@ -1374,7 +1386,7 @@ voiceRouter.post('/ringback-start', async (req, res) => {
             ((request.passengers_male || 0) + (request.passengers_female || 0));
           
           // Tell the driver about the match
-          twiml.say({ voice: 'alice' }, `Hello, this is the ride service. We matched ${riderInfo} to your ride. They need a ride with ${totalPassengers} ${totalPassengers === 1 ? 'passenger' : 'passengers'} at ${preferredTime}.`);
+          playPrompt(twiml, 'great_news_found_ride');
           
           // Offer options
           const gather = twiml.gather({
@@ -1384,18 +1396,18 @@ voiceRouter.post('/ringback-start', async (req, res) => {
             action: `/voice/driver-confirm-match?match_id=${match.id}&request_id=${request.id}`
           });
           
-          gather.say({ voice: 'alice' }, 'Press 1 to accept this passenger, 2 to decline, or 3 to hear the passenger\'s phone number.');
-          twiml.say({ voice: 'alice' }, 'No input received. Please call back later if you\'re interested in taking this passenger. Goodbye.');
+          playPrompt(gather, 'press_1_accept_2_decline_3_hear_phone');
+          playPrompt(twiml, 'thanks_goodbye');
         } else {
-          twiml.say({ voice: 'alice' }, 'Hello, this is the ride service. We found a matching passenger for your ride offer, but we\'re having trouble retrieving the details. Please call back later. Thank you.');
+          playPrompt(twiml, 'info_not_available');
         }
       } else {
-        twiml.say({ voice: 'alice' }, 'Hello, this is the ride service. We called to inform you about a passenger match, but it seems the information is no longer available. Please call back for details. Thank you.');
+        playPrompt(twiml, 'info_not_available');
       }
     }
   } catch (error) {
     console.error('Error in ringback handler:', error);
-    twiml.say({ voice: 'alice' }, 'Hello, this is the ride service. We have an important update about your ride. Please call back for details. Thank you.');
+    playPrompt(twiml, 'error_generic_try_later');
   }
   
   twiml.hangup();
@@ -1408,18 +1420,27 @@ voiceRouter.post('/ringback-hear-phone', async (req, res) => {
   const { phone, type } = req.query;
   
   try {
-    twiml.say({ voice: 'alice' }, `The ${type === 'driver' ? 'driver' : 'passenger'}'s phone number is:`);
-    sayDigits(twiml, phone);
-    
-    // Repeat for clarity
+    playPrompt(twiml, type === 'driver' ? 'driver_phone_number_is' : 'passenger_phone_number_is');
+    {
+      const s = String(phone || '');
+      for (const ch of s) {
+        if (ch === '+') playPrompt(twiml, 'plus');
+        else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+      }
+    }
     twiml.pause({ length: 1 });
-    twiml.say({ voice: 'alice' }, 'I\'ll repeat that:');
-    sayDigits(twiml, phone);
-    
-    twiml.say({ voice: 'alice' }, 'Thank you for using our service. Goodbye.');
+    playPrompt(twiml, 'will_repeat');
+    {
+      const s = String(phone || '');
+      for (const ch of s) {
+        if (ch === '+') playPrompt(twiml, 'plus');
+        else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+      }
+    }
+    playPrompt(twiml, 'thanks_goodbye');
   } catch (error) {
     console.error('Error in phone number handler:', error);
-    twiml.say({ voice: 'alice' }, 'Sorry, we\'re unable to provide the phone number at this time. Please call back later.');
+    playPrompt(twiml, 'error_generic_try_later');
   }
   
   twiml.hangup();

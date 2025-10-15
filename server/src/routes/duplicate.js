@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import twilio from 'twilio';
 import { say } from '../utils/twiml.js';
+import { playPrompt } from '../utils/recordings.js';
 import { getSession, patchSession } from '../store/session.js';
 import { parseDateChoice, combineDateAndHHMM } from '../utils/time.js';
 import { DateTime } from 'luxon';
@@ -24,8 +25,8 @@ duplicateRouter.post('/date', async (req, res) => {
     if (d === '1') {
       // Begin date selection for the duplicated ride
       patchSession(callSid, { step: 'manage_duplicate_date_choice', data: session.data });
-      const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate/date-choice' });
-      say(g, 'Choose a date for the duplicated ride: for today press 1, for tomorrow press 2, for another date press 3.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate/date-choice' });
+  playPrompt(g, 'date_choice_prompt');
       return res.type('text/xml').send(twiml.toString());
     } else {
       // Return to main menu
@@ -34,8 +35,8 @@ duplicateRouter.post('/date', async (req, res) => {
       return res.type('text/xml').send(twiml.toString());
     }
   } catch (error) {
-    console.error('Error in duplicate-date flow:', error);
-    say(twiml, 'Sorry, there was an error processing your request. Please try again later.');
+  console.error('Error in duplicate-date flow:', error);
+  playPrompt(twiml, 'error_generic_try_later');
     patchSession(callSid, { step: 'manage_main_menu', data: session.data });
     twiml.redirect('/voice/manage');
   }
@@ -62,8 +63,8 @@ duplicateRouter.post('/date-choice', async (req, res) => {
       if (d === '3') {
         // Need specific date
         patchSession(callSid, { step: 'manage_duplicate_date_input', data: session.data });
-        const g = twiml.gather({ input: 'dtmf', numDigits: 6, timeout: 8, action: '/voice/manage/duplicate/date-input' });
-        say(g, 'Enter a date as six digits: D D M M Y Y. For example, one five zero nine two five.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 6, timeout: 8, action: '/voice/manage/duplicate/date-input' });
+  playPrompt(g, 'enter_date_six_digits');
         return res.type('text/xml').send(twiml.toString());
       } else {
         // Today or tomorrow
@@ -72,22 +73,22 @@ duplicateRouter.post('/date-choice', async (req, res) => {
         // Now ask for time
         patchSession(callSid, { step: 'manage_duplicate_time', data: session.data });
         const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time' });
-        
         if (session.data.duplicateType === 'driver') {
-          say(g, 'Enter departure time as four digits. For example, zero seven thirty.');
+          playPrompt(g, 'time_enter_departure');
         } else {
-          say(g, 'Enter the earliest time as four digits.');
+          playPrompt(g, 'time_enter_earliest');
         }
         return res.type('text/xml').send(twiml.toString());
       }
     } else {
-      const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate/date-choice' });
-      say(g, 'Invalid input. For today press 1, for tomorrow press 2, for another date press 3.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate/date-choice' });
+  playPrompt(g, 'invalid_input');
+  playPrompt(g, 'date_choice_prompt');
       return res.type('text/xml').send(twiml.toString());
     }
   } catch (error) {
-    console.error('Error in duplicate-date-choice flow:', error);
-    say(twiml, 'Sorry, there was an error processing your request. Please try again later.');
+  console.error('Error in duplicate-date-choice flow:', error);
+  playPrompt(twiml, 'error_generic_try_later');
     patchSession(callSid, { step: 'manage_main_menu', data: session.data });
     twiml.redirect('/voice/manage');
   }
@@ -112,16 +113,16 @@ duplicateRouter.post('/date-input', async (req, res) => {
     session.data.dateDay = day.toISO();
     patchSession(callSid, { step: 'manage_duplicate_time', data: session.data });
     const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time' });
-    
     if (session.data.duplicateType === 'driver') {
-      say(g, 'Enter departure time as four digits.');
+      playPrompt(g, 'time_enter_departure');
     } else {
-      say(g, 'Enter the earliest time as four digits.');
+      playPrompt(g, 'time_enter_earliest');
     }
     return res.type('text/xml').send(twiml.toString());
   } catch (e) {
-    const g = twiml.gather({ input: 'dtmf', numDigits: 6, timeout: 8, action: '/voice/manage/duplicate/date-input' });
-    say(g, 'Invalid date. Enter the date again as six digits day, month, year.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 6, timeout: 8, action: '/voice/manage/duplicate/date-input' });
+  playPrompt(g, 'invalid_date_try_again');
+  playPrompt(g, 'enter_date_six_digits');
     return res.type('text/xml').send(twiml.toString());
   }
 });
@@ -140,8 +141,8 @@ duplicateRouter.post('/time', async (req, res) => {
   
   try {
     if (!/^\d{4}$/.test(d)) {
-      const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time' });
-      say(g, 'Invalid time. Enter four digits.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time' });
+  playPrompt(g, 'invalid_time_try_again');
       return res.type('text/xml').send(twiml.toString());
     }
     
@@ -150,19 +151,19 @@ duplicateRouter.post('/time', async (req, res) => {
     if (session.data.duplicateType === 'driver') {
       // For driver, we're done collecting time info
       patchSession(callSid, { step: 'manage_duplicate_confirm', data: session.data });
-      const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate/confirm' });
-      say(g, 'To confirm duplicating this ride press 1. To cancel press 2.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate/confirm' });
+  playPrompt(g, 'press_1_confirm_2_restart');
       return res.type('text/xml').send(twiml.toString());
     } else {
       // For rider, we need latest time too
       patchSession(callSid, { step: 'manage_duplicate_time_latest', data: session.data });
-      const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time-latest' });
-      say(g, 'Enter the latest time as four digits.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time-latest' });
+  playPrompt(g, 'time_enter_latest');
       return res.type('text/xml').send(twiml.toString());
     }
   } catch (error) {
-    console.error('Error in duplicate-time flow:', error);
-    say(twiml, 'Sorry, there was an error processing your request. Please try again later.');
+  console.error('Error in duplicate-time flow:', error);
+  playPrompt(twiml, 'error_generic_try_later');
     patchSession(callSid, { step: 'manage_main_menu', data: session.data });
     twiml.redirect('/voice/manage');
   }
@@ -182,8 +183,9 @@ duplicateRouter.post('/time-latest', async (req, res) => {
   
   try {
     if (!/^\d{4}$/.test(d)) {
-      const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time-latest' });
-      say(g, 'Invalid time. Enter the latest time as four digits.');
+  const g = twiml.gather({ input: 'dtmf', numDigits: 4, timeout: 8, action: '/voice/manage/duplicate/time-latest' });
+  playPrompt(g, 'invalid_time_try_again');
+  playPrompt(g, 'time_enter_latest');
       return res.type('text/xml').send(twiml.toString());
     }
     
@@ -193,8 +195,8 @@ duplicateRouter.post('/time-latest', async (req, res) => {
     say(g, 'To confirm duplicating this ride request press 1. To cancel press 2.');
     return res.type('text/xml').send(twiml.toString());
   } catch (error) {
-    console.error('Error in duplicate-time-latest flow:', error);
-    say(twiml, 'Sorry, there was an error processing your request. Please try again later.');
+  console.error('Error in duplicate-time-latest flow:', error);
+  playPrompt(twiml, 'error_generic_try_later');
     patchSession(callSid, { step: 'manage_main_menu', data: session.data });
     twiml.redirect('/voice/manage');
   }
@@ -237,11 +239,8 @@ duplicateRouter.post('/confirm', async (req, res) => {
         const reqs = await listOpenRequestsForOffer(rec);
         const matches = await matchNewOffer(rec, reqs);
         
-        if (matches.length > 0) {
-          say(twiml, `Your ride has been duplicated. We found ${matches.length} matching ${matches.length === 1 ? 'request' : 'requests'}. The riders will be notified.`);
-        } else {
-          say(twiml, 'Your ride has been duplicated with the new date and time. We will notify you when matching requests are found.');
-        }
+        // Generic success prompt
+        playPrompt(twiml, 'thanks_goodbye');
       } else {
         // Duplicate ride request
         const earliestUtc = combineDateAndHHMM(DateTime.fromISO(dateDay), session.data.hhmm).toISO();
@@ -263,24 +262,21 @@ duplicateRouter.post('/confirm', async (req, res) => {
         const offers = await listActiveOffersForRequest(rec);
         const matches = await matchNewRequest(rec, offers);
         
-        if (matches.length > 0) {
-          say(twiml, `Your ride request has been duplicated. We found ${matches.length} matching ${matches.length === 1 ? 'ride' : 'rides'}. The drivers will be notified.`);
-        } else {
-          say(twiml, 'Your ride request has been duplicated with the new date and time. We will notify you when a matching ride is found.');
-        }
+        // Generic success prompt
+        playPrompt(twiml, 'thanks_goodbye');
       }
       
       patchSession(callSid, { step: 'manage_main_menu', data: {} });
       twiml.redirect('/voice/manage');
     } else {
       // Cancel duplication
-      say(twiml, 'Duplication cancelled.');
+  playPrompt(twiml, 'thanks_goodbye');
       patchSession(callSid, { step: 'manage_main_menu', data: {} });
       twiml.redirect('/voice/manage');
     }
   } catch (error) {
-    console.error('Error in duplicate-confirm flow:', error);
-    say(twiml, 'Sorry, there was an error duplicating your ride. Please try again later.');
+  console.error('Error in duplicate-confirm flow:', error);
+  playPrompt(twiml, 'error_generic_try_later');
     patchSession(callSid, { step: 'manage_main_menu', data: {} });
     twiml.redirect('/voice/manage');
   }
