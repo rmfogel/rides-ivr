@@ -1,0 +1,30 @@
+{
+  "name": "rides-ivr-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Twilio IVR server for closed-community ride matching",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon --watch src --ext js --exec node src/app.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "tts:he": "node scripts/tts-generate.js --lang he",
+    "tts:he:dry": "node scripts/tts-generate.js --lang he --dry-run"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.2",
+    "luxon": "^3.5.0",
+    "mongodb": "^6.9.0",
+    "twilio": "^5.3.3",
+    "@aws-sdk/client-polly": "^3.645.0",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
