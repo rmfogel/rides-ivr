@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import twilio from 'twilio';
-import { say } from '../utils/twiml.js';
 import { playPrompt } from '../utils/recordings.js';
 import { getSession, patchSession } from '../store/session.js';
 import { parseDateChoice, combineDateAndHHMM } from '../utils/time.js';
@@ -192,7 +191,7 @@ duplicateRouter.post('/time-latest', async (req, res) => {
     session.data.hhmm_latest = d;
     patchSession(callSid, { step: 'manage_duplicate_confirm', data: session.data });
     const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate/confirm' });
-    say(g, 'To confirm duplicating this ride request press 1. To cancel press 2.');
+    playPrompt(g, 'press_1_confirm_2_restart');
     return res.type('text/xml').send(twiml.toString());
   } catch (error) {
   console.error('Error in duplicate-time-latest flow:', error);

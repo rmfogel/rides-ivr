@@ -15,11 +15,9 @@ import {
 import { matchNewOffer, matchNewRequest } from '../engine/matching.js';
 import { DateTime } from 'luxon';
 import { TZ } from '../utils/time.js';
-import { say, gatherDigits, hangup } from '../utils/twiml.js';
-import { audioUrl, HE_PROMPTS } from '../utils/media.js';
 import { playPrompt } from '../utils/recordings.js';
 import logger from '../utils/logger.js';
-import { DEFAULT_LANGUAGE, LANGUAGES, TRANSLATIONS, getText } from '../config/language.js';
+import { DEFAULT_LANGUAGE } from '../config/language.js';
 
 export const voiceRouter = Router();
 
@@ -41,8 +39,6 @@ voiceRouter.post('/incoming', async (req, res) => {
   const phone = req.body.From;
   // Set session language based on query param if provided, default to English
   const language = req.query.lang || DEFAULT_LANGUAGE;
-  const isHebrew = language === 'he';
-  const useRecorded = true; // switched to use recordings everywhere
   
   // Store language preference in session for future requests
   if (!req.session) {
@@ -59,30 +55,17 @@ voiceRouter.post('/incoming', async (req, res) => {
   
   const twiml = new twilio.twiml.VoiceResponse();
   
-  // Use recorded audio for Hebrew if the feature flag is enabled; otherwise fallback to TTS
-  if (useRecorded) {
-    playPrompt(twiml, 'welcome');
-  } else {
-    const welcomeText = getText('welcome', language);
-    say(twiml, welcomeText, isHebrew);
-  }
+  // Use recorded audio for Hebrew
+  playPrompt(twiml, 'welcome');
+  
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 6,
     action: `/voice/menu?lang=${language}`
   });
-  if (useRecorded) {
-    playPrompt(gather, 'main_menu');
-  } else {
-    const menuText = getText('mainMenu', language);
-    say(gather, menuText, isHebrew);
-  }
-  if (useRecorded) {
-    playPrompt(twiml, 'no_input_goodbye');
-  } else {
-    playPrompt(twiml, 'no_input_goodbye');
-  }
+  playPrompt(gather, 'main_menu');
+  playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
 });
