@@ -22,6 +22,13 @@ pids/
 server/.env
 server/.env.*
 
+# Google Cloud credentials (NEVER COMMIT!)
+*-key.json
+tts-key.json
+credentials.json
+service-account*.json
+gcloud-*.json
+
 # Coverage and test artifacts
 coverage/
 .nyc_output/

@@ -11,7 +11,11 @@
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "tts:he": "node scripts/tts-generate.js --lang he",
-    "tts:he:dry": "node scripts/tts-generate.js --lang he --dry-run"
+    "tts:he:dry": "node scripts/tts-generate.js --lang he --dry-run",
+    "audio:generate": "node scripts/generate-audio.js",
+    "audio:regenerate": "node scripts/generate-audio.js --regenerate",
+    "audio:test": "node scripts/generate-audio.js --test",
+    "audio:voices": "node scripts/generate-audio.js --list-voices"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
