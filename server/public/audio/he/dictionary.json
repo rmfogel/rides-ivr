@@ -4,8 +4,8 @@
     "description": "Dictionary mapping numeric file IDs to prompt text. Place matching <ID>.mp3 files in this folder.",
     "note": "Texts are indicative. You can replace with your exact scripts."
   },
-  "001": "ברוכים הבאים לשירות הנסיעות.",
-  "002": "לתפריט: לנהג הקש 1. לנוסע הקש 2. לניהול הקש 3.",
+  "001": " ברוכים הבאים לטרמפיאדה.",
+  "002": "תפריט: לנהג הקש 1. לנוסע הקש 2. לניהול הקש 3.",
   "003": "לא התקבל קלט. להתראות.",
   "004": "קלט לא תקין.",
   "005": "האפשרות אינה זמינה כרגע.",
