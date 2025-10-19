@@ -1130,8 +1130,8 @@ voiceRouter.post('/driver-total-seats', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
-  // Validate input is a single digit
-  if (!/^\d$/.test(Digits)) {
+  // Validate input exists and is a single digit
+  if (!Digits || !/^\d$/.test(Digits)) {
     playPrompt(twiml, 'invalid_passenger_count');
     const gather = twiml.gather({
       input: 'dtmf',
@@ -1159,12 +1159,12 @@ voiceRouter.post('/driver-total-seats', (req, res) => {
   // Store total seats
   req.session.totalSeats = totalSeats;
   
-  // Ask how many are male-only
+  // Ask how many are male-only - pass total in query params
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/driver-male-seats'
+    action: `/voice/driver-male-seats?total=${totalSeats}`
   });
   playPrompt(gather, 'driver_male_only_from_total');
   playPrompt(twiml, 'no_input_goodbye');
@@ -1179,16 +1179,17 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
-  const totalSeats = req.session.totalSeats || 0;
+  // Get total from query params or session
+  const totalSeats = parseInt(req.query.total) || req.session.totalSeats || 0;
   
-  // Validate input is a single digit
-  if (!/^\d$/.test(Digits)) {
+  // Validate input exists and is a single digit
+  if (!Digits || !/^\d$/.test(Digits)) {
     playPrompt(twiml, 'invalid_passenger_count');
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/driver-male-seats'
+      action: `/voice/driver-male-seats?total=${totalSeats}`
     });
     playPrompt(gather, 'driver_male_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1206,7 +1207,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/driver-male-seats'
+      action: `/voice/driver-male-seats?total=${totalSeats}`
     });
     playPrompt(gather, 'driver_male_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1222,7 +1223,8 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
   if (maleOnlySeats === totalSeats) {
     req.session.femaleOnlySeats = 0;
     req.session.unisexSeats = 0;
-    twiml.redirect('/voice/driver-confirm');
+    req.session.totalSeats = totalSeats;
+    twiml.redirect(`/voice/driver-confirm?total=${totalSeats}&male=${maleOnlySeats}&female=0`);
     res.type('text/xml').send(twiml.toString());
     return;
   }
@@ -1232,7 +1234,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/driver-female-seats'
+    action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}`
   });
   playPrompt(gather, 'driver_female_only_from_total');
   playPrompt(twiml, 'no_input_goodbye');
@@ -1247,18 +1249,19 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
-  const totalSeats = req.session.totalSeats || 0;
-  const maleOnlySeats = req.session.maleOnlySeats || 0;
+  // Get values from query params or session
+  const totalSeats = parseInt(req.query.total) || req.session.totalSeats || 0;
+  const maleOnlySeats = parseInt(req.query.male) || req.session.maleOnlySeats || 0;
   const remainingSeats = totalSeats - maleOnlySeats;
   
-  // Validate input is a single digit
-  if (!/^\d$/.test(Digits)) {
+  // Validate input exists and is a single digit
+  if (!Digits || !/^\d$/.test(Digits)) {
     playPrompt(twiml, 'invalid_passenger_count');
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/driver-female-seats'
+      action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}`
     });
     playPrompt(gather, 'driver_female_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1276,7 +1279,7 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/driver-female-seats'
+      action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}`
     });
     playPrompt(gather, 'driver_female_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1291,9 +1294,11 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
   // Auto-calculate unisex seats (remainder)
   const unisexSeats = totalSeats - maleOnlySeats - femaleOnlySeats;
   req.session.unisexSeats = unisexSeats;
+  req.session.totalSeats = totalSeats;
+  req.session.maleOnlySeats = maleOnlySeats;
   
   // Go directly to confirmation
-  twiml.redirect('/voice/driver-confirm');
+  twiml.redirect(`/voice/driver-confirm?total=${totalSeats}&male=${maleOnlySeats}&female=${femaleOnlySeats}`);
   
   res.type('text/xml').send(twiml.toString());
 });
