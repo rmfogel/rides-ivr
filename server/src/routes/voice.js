@@ -983,12 +983,12 @@ voiceRouter.post('/rider-submit', async (req, res) => {
         // Read out the phone number digit by digit
         playPrompt(twiml, 'driver_phone_number_is');
         // Play driver phone digits
-        {
-          // use recordings digit-by-digit
-          const s = String(driverPhone || '');
-          for (const ch of s) {
-            if (ch === '+') playPrompt(twiml, 'plus');
-            else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+        const phoneStr = String(driverPhone || '');
+        for (const ch of phoneStr) {
+          if (ch === '+') {
+            playPrompt(twiml, 'plus');
+          } else if (/\d/.test(ch)) {
+            playPrompt(twiml, `digit_${ch}`);
           }
         }
         
@@ -1628,11 +1628,12 @@ voiceRouter.post('/driver-submit', async (req, res) => {
         
         // Read out the phone number digit by digit
         playPrompt(twiml, 'passenger_phone_number_is');
-        {
-          const s = String(riderPhone || '');
-          for (const ch of s) {
-            if (ch === '+') playPrompt(twiml, 'plus');
-            else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+        const phoneStr2 = String(riderPhone || '');
+        for (const ch of phoneStr2) {
+          if (ch === '+') {
+            playPrompt(twiml, 'plus');
+          } else if (/\d/.test(ch)) {
+            playPrompt(twiml, `digit_${ch}`);
           }
         }
         
