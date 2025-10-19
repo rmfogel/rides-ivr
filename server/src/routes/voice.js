@@ -1117,7 +1117,7 @@ voiceRouter.post('/driver-seats', (req, res) => {
     action: '/voice/driver-male-seats'
   });
   playPrompt(gather, 'passenger_details_intro');
-  playPrompt(gather, 'how_many_males');
+  playPrompt(gather, 'driver_male_seats_question');
   playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
@@ -1139,7 +1139,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
       timeout: 10,
       action: '/voice/driver-male-seats'
     });
-    playPrompt(gather, 'how_many_males');
+    playPrompt(gather, 'driver_male_seats_question');
     playPrompt(twiml, 'no_input_goodbye');
     twiml.hangup();
     res.type('text/xml').send(twiml.toString());
@@ -1156,7 +1156,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
     timeout: 10,
     action: '/voice/driver-female-seats'
   });
-  playPrompt(gather, 'how_many_females');
+  playPrompt(gather, 'driver_female_seats_question');
   playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
@@ -1178,7 +1178,7 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
       timeout: 10,
       action: '/voice/driver-female-seats'
     });
-    playPrompt(gather, 'how_many_females');
+    playPrompt(gather, 'driver_female_seats_question');
     playPrompt(twiml, 'no_input_goodbye');
     twiml.hangup();
     res.type('text/xml').send(twiml.toString());

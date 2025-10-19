@@ -57,6 +57,10 @@ export const PROMPT_IDS = {
   time_outside_range: '094',
   invalid_passenger_count: '095',
   session_expired_restart: '096',
+  
+  // Driver-specific seat questions
+  driver_male_seats_question: '097',  // כמה מקומות לגברים יש לך?
+  driver_female_seats_question: '098', // כמה מקומות לנשים יש לך?
 
   // Match / ringback
   great_news_found_ride: '100',
