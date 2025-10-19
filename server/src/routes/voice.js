@@ -494,10 +494,13 @@ voiceRouter.post('/rider-preferred-time-entry', (req, res) => {
     }
     
     // Make sure preferred time is within the earliest and latest time range
-    const earliestHours = req.session.earliestTime.hours;
-    const earliestMinutes = req.session.earliestTime.minutes;
-    const latestHours = req.session.latestTime.hours;
-    const latestMinutes = req.session.latestTime.minutes;
+    // Parse times from query params (format: HH:MM)
+    const [earliestHoursStr, earliestMinutesStr] = (earliest || '').split(':');
+    const [latestHoursStr, latestMinutesStr] = (latest || '').split(':');
+    const earliestHours = parseInt(earliestHoursStr, 10);
+    const earliestMinutes = parseInt(earliestMinutesStr, 10);
+    const latestHours = parseInt(latestHoursStr, 10);
+    const latestMinutes = parseInt(latestMinutesStr, 10);
     
     const isBefore = (hours < earliestHours) || (hours === earliestHours && minutes < earliestMinutes);
     const isAfter = (hours > latestHours) || (hours === latestHours && minutes > latestMinutes);
