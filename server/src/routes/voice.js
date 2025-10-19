@@ -362,7 +362,7 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
     
     // Get earliest time from query params (more reliable than session in Twilio)
     const earliestTimeStr = req.query.earliest;
-    if (!earliestTimeStr || earliestTimeStr.length !== 4) {
+    if (!earliestTimeStr || earliestTimeStr.length !== 5) {
       logger.error('Earliest time not found in query params');
       playPrompt(twiml, 'session_expired_restart');
       twiml.redirect('/voice/rider-new');
@@ -370,9 +370,10 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
       return;
     }
     
-    // Parse earliest time from query string
-    const earliestHours = parseInt(earliestTimeStr.substring(0, 2), 10);
-    const earliestMinutes = parseInt(earliestTimeStr.substring(2, 4), 10);
+    // Parse earliest time from query string (format: HH:MM)
+    const [earliestHoursStr, earliestMinutesStr] = earliestTimeStr.split(':');
+    const earliestHours = parseInt(earliestHoursStr, 10);
+    const earliestMinutes = parseInt(earliestMinutesStr, 10);
     
     // Also restore session data
     req.session.earliestTime = { hours: earliestHours, minutes: earliestMinutes };
