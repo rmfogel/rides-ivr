@@ -96,33 +96,14 @@ voiceRouter.post('/menu', (req, res) => {
   res.type('text/xml').send(twiml.toString());
 });
 
-// Basic rider menu
+// Basic rider menu - redirect directly to new ride request
 voiceRouter.post('/rider', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const gather = twiml.gather({
-    input: 'dtmf',
-    numDigits: 1,
-    timeout: 6,
-    action: '/voice/rider-action'
-  });
-  playPrompt(gather, 'main_menu');
-  playPrompt(twiml, 'no_input_goodbye');
-  twiml.hangup();
-  res.type('text/xml').send(twiml.toString());
-});
-
-// Rider action handler
-voiceRouter.post('/rider-action', (req, res) => {
-  const twiml = new twilio.twiml.VoiceResponse();
-  const { Digits } = req.body;
+  // Get language preference
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
   
-  if (Digits === '1') {
-    // Redirect to new ride flow - simplified for demo
-    twiml.redirect('/voice/rider-new');
-  } else {
-    playPrompt(twiml, 'not_implemented');
-    twiml.hangup();
-  }
+  // Go directly to ride request flow
+  twiml.redirect(`/voice/rider-new?lang=${language}`);
   
   res.type('text/xml').send(twiml.toString());
 });
