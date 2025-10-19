@@ -1,5 +1,6 @@
 import { addMatch, getRequestById, getOfferById } from "../db/repo.js";
 import { ringbackRider, ringbackDriver } from "../notify/ringback.js";
+import logger from "../utils/logger.js";
 
 function allocFromOffer(seats, need, allowSameGenderCouple=false, together=false) {
   // seats: { male_only, female_only, unisex }  // need: { couples, males, females }
