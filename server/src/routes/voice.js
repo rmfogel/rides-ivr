@@ -141,10 +141,10 @@ voiceRouter.post('/rider-direction', (req, res) => {
   
   if (Digits === '1') {
     req.session.direction = 'FROM';
-    twiml.redirect('/voice/rider-date');
+    twiml.redirect('/voice/rider-date?dir=FROM');
   } else if (Digits === '2') {
     req.session.direction = 'TO';
-    twiml.redirect('/voice/rider-date');
+    twiml.redirect('/voice/rider-date?dir=TO');
   } else {
     // Clear error message and retry
     playPrompt(twiml, 'invalid_direction_retry');
@@ -166,11 +166,14 @@ voiceRouter.post('/rider-direction', (req, res) => {
 voiceRouter.post('/rider-date', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   
+  // Get direction from query params or session
+  const direction = req.query.dir || (req.session && req.session.direction) || '';
+  
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 6,
-    action: '/voice/rider-date-choice'
+    action: `/voice/rider-date-choice?dir=${direction}`
   });
   playPrompt(gather, 'date_choice_prompt');
   playPrompt(twiml, 'no_input_goodbye');
@@ -185,17 +188,21 @@ voiceRouter.post('/rider-date-choice', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  // Get direction from query params
+  const direction = req.query.dir || req.session.direction || '';
+  req.session.direction = direction;
+  
   if (Digits === '1' || Digits === '2') {
     // Today or tomorrow
     try {
       const now = DateTime.now().setZone(TZ);
       const date = Digits === '1' ? now : now.plus({ days: 1 });
       req.session.rideDate = date.toISODate();
-      twiml.redirect('/voice/rider-time');
+      twiml.redirect(`/voice/rider-time?date=${date.toISODate()}&dir=${direction}`);
     } catch (error) {
       console.error('Error setting date:', error);
       playPrompt(twiml, 'error_generic_try_later');
-      twiml.redirect('/voice/rider-date');
+      twiml.redirect(`/voice/rider-date?dir=${direction}`);
     }
   } else if (Digits === '3') {
     // Custom date
@@ -203,11 +210,11 @@ voiceRouter.post('/rider-date-choice', (req, res) => {
       input: 'dtmf',
       numDigits: 6,
       timeout: 15,
-      action: '/voice/rider-custom-date'
+      action: `/voice/rider-custom-date?dir=${direction}`
     });
     playPrompt(gather, 'enter_date_six_digits');
     playPrompt(twiml, 'invalid_date_try_again');
-    twiml.redirect('/voice/rider-date');
+    twiml.redirect(`/voice/rider-date?dir=${direction}`);
   } else {
     // Invalid choice - retry with clear message
     playPrompt(twiml, 'invalid_date_option_retry');
@@ -215,7 +222,7 @@ voiceRouter.post('/rider-date-choice', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 6,
-      action: '/voice/rider-date-choice'
+      action: `/voice/rider-date-choice?dir=${direction}`
     });
     playPrompt(gather, 'date_choice_prompt');
     playPrompt(twiml, 'no_input_goodbye');
@@ -230,6 +237,10 @@ voiceRouter.post('/rider-custom-date', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  // Get direction from query params
+  const direction = req.query.dir || req.session.direction || '';
+  req.session.direction = direction;
   
   try {
     if (!/^\d{6}$/.test(Digits)) throw new Error('Invalid date format');
@@ -247,7 +258,7 @@ voiceRouter.post('/rider-custom-date', (req, res) => {
     if (date < now) throw new Error('Date is in the past');
     
     req.session.rideDate = date.toISODate();
-    twiml.redirect('/voice/rider-time');
+    twiml.redirect(`/voice/rider-time?date=${date.toISODate()}&dir=${direction}`);
   } catch (error) {
     console.error('Error processing custom date:', error);
     playPrompt(twiml, 'invalid_date_try_again');
@@ -255,7 +266,7 @@ voiceRouter.post('/rider-custom-date', (req, res) => {
       input: 'dtmf',
       numDigits: 6,
       timeout: 15,
-      action: '/voice/rider-custom-date'
+      action: `/voice/rider-custom-date?dir=${direction}`
     });
     playPrompt(gather, 'enter_date_six_digits');
     playPrompt(twiml, 'no_input_goodbye');
@@ -849,30 +860,11 @@ voiceRouter.post('/rider-submit', async (req, res) => {
 // Basic driver menu
 voiceRouter.post('/driver', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const gather = twiml.gather({
-    input: 'dtmf',
-    numDigits: 1,
-    timeout: 6,
-    action: '/voice/driver-action'
-  });
-  playPrompt(gather, 'driver_menu');
-  playPrompt(twiml, 'no_input_goodbye');
-  twiml.hangup();
-  res.type('text/xml').send(twiml.toString());
-});
-
-// Driver action handler
-voiceRouter.post('/driver-action', (req, res) => {
-  const twiml = new twilio.twiml.VoiceResponse();
-  const { Digits } = req.body;
+  // Get language preference
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
   
-  if (Digits === '1') {
-    // Redirect to new ride offer flow - simplified for demo
-    twiml.redirect('/voice/driver-new');
-  } else {
-    playPrompt(twiml, 'not_implemented');
-    twiml.hangup();
-  }
+  // Go directly to ride offer flow
+  twiml.redirect(`/voice/driver-new?lang=${language}`);
   
   res.type('text/xml').send(twiml.toString());
 });
