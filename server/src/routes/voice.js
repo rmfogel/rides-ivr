@@ -1937,20 +1937,21 @@ voiceRouter.post('/ringback-hear-phone', async (req, res) => {
   
   try {
     playPrompt(twiml, type === 'driver' ? 'driver_phone_number_is' : 'passenger_phone_number_is');
-    {
-      const s = String(phone || '');
-      for (const ch of s) {
-        if (ch === '+') playPrompt(twiml, 'plus');
-        else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+    const phoneStr = String(phone || '');
+    for (const ch of phoneStr) {
+      if (ch === '+') {
+        playPrompt(twiml, 'plus');
+      } else if (/\d/.test(ch)) {
+        playPrompt(twiml, `digit_${ch}`);
       }
     }
     twiml.pause({ length: 1 });
     playPrompt(twiml, 'will_repeat');
-    {
-      const s = String(phone || '');
-      for (const ch of s) {
-        if (ch === '+') playPrompt(twiml, 'plus');
-        else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
+    for (const ch of phoneStr) {
+      if (ch === '+') {
+        playPrompt(twiml, 'plus');
+      } else if (/\d/.test(ch)) {
+        playPrompt(twiml, `digit_${ch}`);
       }
     }
     playPrompt(twiml, 'thanks_goodbye');
