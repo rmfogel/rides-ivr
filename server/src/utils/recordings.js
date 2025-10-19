@@ -49,6 +49,15 @@ export const PROMPT_IDS = {
   request_registered_keep_active: '081',
   offer_registered_keep_active: '082',
 
+  // Error messages with context
+  invalid_direction_retry: '090',
+  invalid_date_option_retry: '091',
+  invalid_time_format: '092',
+  time_must_be_later: '093',
+  time_outside_range: '094',
+  invalid_passenger_count: '095',
+  session_expired_restart: '096',
+
   // Match / ringback
   great_news_found_ride: '100',
   driver_phone_number_is: '101',

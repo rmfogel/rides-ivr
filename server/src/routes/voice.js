@@ -165,8 +165,17 @@ voiceRouter.post('/rider-direction', (req, res) => {
     req.session.direction = 'TO';
     twiml.redirect('/voice/rider-date');
   } else {
-    playPrompt(twiml, 'invalid_input');
-    twiml.redirect('/voice/rider-new');
+    // Clear error message and retry
+    playPrompt(twiml, 'invalid_direction_retry');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 6,
+      action: '/voice/rider-direction'
+    });
+    playPrompt(gather, 'direction_prompt');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -203,8 +212,8 @@ voiceRouter.post('/rider-date-choice', (req, res) => {
       req.session.rideDate = date.toISODate();
       twiml.redirect('/voice/rider-time');
     } catch (error) {
-  console.error('Error setting date:', error);
-  playPrompt(twiml, 'invalid_date_try_again');
+      console.error('Error setting date:', error);
+      playPrompt(twiml, 'error_generic_try_later');
       twiml.redirect('/voice/rider-date');
     }
   } else if (Digits === '3') {
@@ -219,8 +228,17 @@ voiceRouter.post('/rider-date-choice', (req, res) => {
     playPrompt(twiml, 'invalid_date_try_again');
     twiml.redirect('/voice/rider-date');
   } else {
-    playPrompt(twiml, 'invalid_input');
-    twiml.redirect('/voice/rider-date');
+    // Invalid choice - retry with clear message
+    playPrompt(twiml, 'invalid_date_option_retry');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 6,
+      action: '/voice/rider-date-choice'
+    });
+    playPrompt(gather, 'date_choice_prompt');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -243,12 +261,24 @@ voiceRouter.post('/rider-custom-date', (req, res) => {
     const date = DateTime.fromObject({ day, month, year }, { zone: TZ });
     if (!date.isValid) throw new Error('Invalid date');
     
+    // Check that date is not in the past
+    const now = DateTime.now().setZone(TZ).startOf('day');
+    if (date < now) throw new Error('Date is in the past');
+    
     req.session.rideDate = date.toISODate();
     twiml.redirect('/voice/rider-time');
   } catch (error) {
-  console.error('Error processing custom date:', error);
-  playPrompt(twiml, 'invalid_date_try_again');
-    twiml.redirect('/voice/rider-date');
+    console.error('Error processing custom date:', error);
+    playPrompt(twiml, 'invalid_date_try_again');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 6,
+      timeout: 15,
+      action: '/voice/rider-custom-date'
+    });
+    playPrompt(gather, 'enter_date_six_digits');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -300,9 +330,17 @@ voiceRouter.post('/rider-earliest-time', (req, res) => {
     playPrompt(twiml, 'no_input_goodbye');
     twiml.hangup();
   } catch (error) {
-  console.error('Error processing earliest time:', error);
-  playPrompt(twiml, 'invalid_time_try_again');
-    twiml.redirect('/voice/rider-time');
+    console.error('Error processing earliest time:', error);
+    playPrompt(twiml, 'invalid_time_format');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 4,
+      timeout: 15,
+      action: '/voice/rider-earliest-time'
+    });
+    playPrompt(gather, 'time_enter_earliest');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -327,7 +365,10 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
     // Make sure earliest time exists in session
     if (!req.session.earliestTime || typeof req.session.earliestTime.hours === 'undefined') {
       logger.error('Earliest time not found in session');
-      throw new Error('Session lost - earliest time missing');
+      playPrompt(twiml, 'session_expired_restart');
+      twiml.redirect('/voice/rider-new');
+      res.type('text/xml').send(twiml.toString());
+      return;
     }
     
     // Make sure latest time is after or equal to earliest time
@@ -339,7 +380,18 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
         latest: `${hours}:${minutes}`,
         earliest: `${earliestHours}:${earliestMinutes}`
       });
-      throw new Error('Latest time must be after earliest time');
+      playPrompt(twiml, 'time_must_be_later');
+      const gather = twiml.gather({
+        input: 'dtmf',
+        numDigits: 4,
+        timeout: 15,
+        action: '/voice/rider-latest-time'
+      });
+      playPrompt(gather, 'time_enter_latest');
+      playPrompt(twiml, 'no_input_goodbye');
+      twiml.hangup();
+      res.type('text/xml').send(twiml.toString());
+      return;
     }
     
     // Store time in session
@@ -362,8 +414,16 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
     }
   } catch (error) {
     logger.error('Error processing latest time:', error);
-    playPrompt(twiml, 'invalid_time_try_again');
-    twiml.redirect('/voice/rider-time');
+    playPrompt(twiml, 'invalid_time_format');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 4,
+      timeout: 15,
+      action: '/voice/rider-latest-time'
+    });
+    playPrompt(gather, 'time_enter_latest');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -420,7 +480,18 @@ voiceRouter.post('/rider-preferred-time-entry', (req, res) => {
     const isAfter = (hours > latestHours) || (hours === latestHours && minutes > latestMinutes);
     
     if (isBefore || isAfter) {
-      throw new Error('Preferred time must be within the time range');
+      playPrompt(twiml, 'time_outside_range');
+      const gather = twiml.gather({
+        input: 'dtmf',
+        numDigits: 4,
+        timeout: 15,
+        action: '/voice/rider-preferred-time-entry'
+      });
+      playPrompt(gather, 'preferred_time_enter');
+      playPrompt(twiml, 'continue_without_preferred');
+      twiml.redirect('/voice/rider-passengers');
+      res.type('text/xml').send(twiml.toString());
+      return;
     }
     
     // Store time in session
@@ -428,7 +499,7 @@ voiceRouter.post('/rider-preferred-time-entry', (req, res) => {
     twiml.redirect('/voice/rider-passengers');
   } catch (error) {
     console.error('Error processing preferred time:', error);
-    // In recordings mode, play a generic continuation prompt
+    playPrompt(twiml, 'invalid_time_format');
     playPrompt(twiml, 'continue_without_preferred');
     twiml.redirect('/voice/rider-passengers');
   }
@@ -460,6 +531,22 @@ voiceRouter.post('/rider-male-count', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  // Validate input is a single digit
+  if (!/^\d$/.test(Digits)) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/rider-male-count'
+    });
+    playPrompt(gather, 'how_many_males');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
   // Store male passenger count
   const maleCount = parseInt(Digits, 10);
   req.session.maleCount = maleCount;
@@ -482,6 +569,22 @@ voiceRouter.post('/rider-female-count', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  // Validate input is a single digit
+  if (!/^\d$/.test(Digits)) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/rider-female-count'
+    });
+    playPrompt(gather, 'how_many_females');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
   
   // Store female passenger count
   const femaleCount = parseInt(Digits, 10);
@@ -517,6 +620,22 @@ voiceRouter.post('/rider-couples-count', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  // Validate input is a single digit
+  if (!/^\d$/.test(Digits)) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/rider-couples-count'
+    });
+    playPrompt(gather, 'couples_how_many');
+    playPrompt(twiml, 'continue_without_preferred');
+    twiml.redirect('/voice/rider-together');
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
   
   // Store couples count
   const couplesCount = parseInt(Digits, 10);
@@ -806,8 +925,17 @@ voiceRouter.post('/driver-direction', (req, res) => {
     req.session.direction = 'TO';
     twiml.redirect('/voice/driver-date');
   } else {
-    playPrompt(twiml, 'invalid_input');
-    twiml.redirect('/voice/driver-new');
+    // Clear error message and retry
+    playPrompt(twiml, 'invalid_direction_retry');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 6,
+      action: '/voice/driver-direction'
+    });
+    playPrompt(gather, 'direction_prompt');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -844,8 +972,8 @@ voiceRouter.post('/driver-date-choice', (req, res) => {
       req.session.rideDate = date.toISODate();
       twiml.redirect('/voice/driver-time');
     } catch (error) {
-  console.error('Error setting date:', error);
-  playPrompt(twiml, 'invalid_date_try_again');
+      console.error('Error setting date:', error);
+      playPrompt(twiml, 'error_generic_try_later');
       twiml.redirect('/voice/driver-date');
     }
   } else if (Digits === '3') {
@@ -860,8 +988,17 @@ voiceRouter.post('/driver-date-choice', (req, res) => {
     playPrompt(twiml, 'invalid_date_try_again');
     twiml.redirect('/voice/driver-date');
   } else {
-    playPrompt(twiml, 'invalid_input');
-    twiml.redirect('/voice/driver-date');
+    // Invalid choice - retry with clear message
+    playPrompt(twiml, 'invalid_date_option_retry');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 6,
+      action: '/voice/driver-date-choice'
+    });
+    playPrompt(gather, 'date_choice_prompt');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -884,12 +1021,24 @@ voiceRouter.post('/driver-custom-date', (req, res) => {
     const date = DateTime.fromObject({ day, month, year }, { zone: TZ });
     if (!date.isValid) throw new Error('Invalid date');
     
+    // Check that date is not in the past
+    const now = DateTime.now().setZone(TZ).startOf('day');
+    if (date < now) throw new Error('Date is in the past');
+    
     req.session.rideDate = date.toISODate();
     twiml.redirect('/voice/driver-time');
   } catch (error) {
-  console.error('Error processing custom date:', error);
-  playPrompt(twiml, 'invalid_date_try_again');
-    twiml.redirect('/voice/driver-date');
+    console.error('Error processing custom date:', error);
+    playPrompt(twiml, 'invalid_date_try_again');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 6,
+      timeout: 15,
+      action: '/voice/driver-custom-date'
+    });
+    playPrompt(gather, 'enter_date_six_digits');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -932,9 +1081,17 @@ voiceRouter.post('/driver-departure-time', (req, res) => {
     req.session.departureTime = { hours, minutes };
     twiml.redirect('/voice/driver-seats');
   } catch (error) {
-  console.error('Error processing departure time:', error);
-  playPrompt(twiml, 'invalid_time_try_again');
-    twiml.redirect('/voice/driver-time');
+    console.error('Error processing departure time:', error);
+    playPrompt(twiml, 'invalid_time_format');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 4,
+      timeout: 15,
+      action: '/voice/driver-departure-time'
+    });
+    playPrompt(gather, 'time_enter_departure');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -964,6 +1121,22 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  // Validate input is a single digit
+  if (!/^\d$/.test(Digits)) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/driver-male-seats'
+    });
+    playPrompt(gather, 'how_many_males');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
   // Store male-only seats
   const maleOnlySeats = parseInt(Digits, 10);
   req.session.maleOnlySeats = maleOnlySeats;
@@ -987,6 +1160,22 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  // Validate input is a single digit
+  if (!/^\d$/.test(Digits)) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/driver-female-seats'
+    });
+    playPrompt(gather, 'how_many_females');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
   // Store female-only seats
   const femaleOnlySeats = parseInt(Digits, 10);
   req.session.femaleOnlySeats = femaleOnlySeats;
@@ -1009,6 +1198,22 @@ voiceRouter.post('/driver-unisex-seats', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  // Validate input is a single digit
+  if (!/^\d$/.test(Digits)) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/driver-unisex-seats'
+    });
+    playPrompt(gather, 'seats');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
   
   // Store unisex seats
   const unisexSeats = parseInt(Digits, 10);
