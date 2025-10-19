@@ -982,15 +982,7 @@ voiceRouter.post('/rider-submit', async (req, res) => {
         
         // Read out the phone number digit by digit
         playPrompt(twiml, 'driver_phone_number_is');
-        // Play driver phone digits
-        const phoneStr = String(driverPhone || '');
-        for (const ch of phoneStr) {
-          if (ch === '+') {
-            playPrompt(twiml, 'plus');
-          } else if (/\d/.test(ch)) {
-            playPrompt(twiml, `digit_${ch}`);
-          }
-        }
+        playDigits(twiml, driverPhone);
         
         // Ask if they want this ride
         const gather = twiml.gather({
@@ -1628,14 +1620,7 @@ voiceRouter.post('/driver-submit', async (req, res) => {
         
         // Read out the phone number digit by digit
         playPrompt(twiml, 'passenger_phone_number_is');
-        const phoneStr2 = String(riderPhone || '');
-        for (const ch of phoneStr2) {
-          if (ch === '+') {
-            playPrompt(twiml, 'plus');
-          } else if (/\d/.test(ch)) {
-            playPrompt(twiml, `digit_${ch}`);
-          }
-        }
+        playDigits(twiml, riderPhone);
         
         // Ask if they want to take this passenger
         const gather = twiml.gather({
@@ -1937,23 +1922,10 @@ voiceRouter.post('/ringback-hear-phone', async (req, res) => {
   
   try {
     playPrompt(twiml, type === 'driver' ? 'driver_phone_number_is' : 'passenger_phone_number_is');
-    const phoneStr = String(phone || '');
-    for (const ch of phoneStr) {
-      if (ch === '+') {
-        playPrompt(twiml, 'plus');
-      } else if (/\d/.test(ch)) {
-        playPrompt(twiml, `digit_${ch}`);
-      }
-    }
+    playDigits(twiml, phone);
     twiml.pause({ length: 1 });
     playPrompt(twiml, 'will_repeat');
-    for (const ch of phoneStr) {
-      if (ch === '+') {
-        playPrompt(twiml, 'plus');
-      } else if (/\d/.test(ch)) {
-        playPrompt(twiml, `digit_${ch}`);
-      }
-    }
+    playDigits(twiml, phone);
     playPrompt(twiml, 'thanks_goodbye');
   } catch (error) {
     console.error('Error in phone number handler:', error);
