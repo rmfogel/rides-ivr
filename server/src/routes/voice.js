@@ -15,7 +15,7 @@ import {
 import { matchNewOffer, matchNewRequest } from '../engine/matching.js';
 import { DateTime } from 'luxon';
 import { TZ } from '../utils/time.js';
-import { playPrompt } from '../utils/recordings.js';
+import { playPrompt, playDigits, playHHMM } from '../utils/recordings.js';
 import logger from '../utils/logger.js';
 import { DEFAULT_LANGUAGE } from '../config/language.js';
 
@@ -781,12 +781,32 @@ voiceRouter.post('/rider-confirm', (req, res) => {
     preferredTimeStr = ` with preferred time of ${prefTime}`;
   }
   
-  const directionStr = direction === 'FROM' ? 'from the settlement' : 'to the settlement';
   const totalCount = maleCount + femaleCount;
-  const passengersStr = `${totalCount} passenger${totalCount > 1 ? 's' : ''}: ${maleCount} male, ${femaleCount} female, including ${couplesCount} couple${couplesCount !== 1 ? 's' : ''}`;
-  const togetherStr = req.session.together ? 'Passengers must travel together' : 'Passengers can travel separately';
   
+  // Play confirmation intro
   playPrompt(twiml, 'confirm_request_intro');
+  
+  // Play ride details using recordings
+  // Direction
+  if (direction === 'FROM') {
+    playPrompt(twiml, 'from_settlement');
+  } else {
+    playPrompt(twiml, 'to_settlement');
+  }
+  
+  // Time range - play earliest to latest
+  if (earliest) {
+    playPrompt(twiml, 'between');
+    const earliestStr = earliest.replace(':', '');
+    playHHMM(twiml, earliestStr);
+    playPrompt(twiml, 'and');
+    const latestStr = latest.replace(':', '');
+    playHHMM(twiml, latestStr);
+  }
+  
+  // Passengers - play total count
+  playDigits(twiml, totalCount.toString());
+  playPrompt(twiml, 'passengers');
   
   const gather = twiml.gather({
     input: 'dtmf',
@@ -921,6 +941,12 @@ voiceRouter.post('/rider-submit', async (req, res) => {
         
         // Tell the rider about the match
         playPrompt(twiml, 'great_news_found_ride');
+        
+        // Play driver's name if available (in English)
+        if (driver && driver.name) {
+          twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, driver.name);
+        }
+        
         // Read out the phone number digit by digit
         playPrompt(twiml, 'driver_phone_number_is');
         // Play driver phone digits
@@ -1421,18 +1447,29 @@ voiceRouter.post('/driver-confirm', (req, res) => {
   const totalSeats = parseInt(req.query.total) || req.session.totalSeats || 0;
   const maleSeats = parseInt(req.query.male) || req.session.maleOnlySeats || 0;
   const femaleSeats = parseInt(req.query.female) || req.session.femaleOnlySeats || 0;
-  
-  // Generate summary for confirmation
-  const dateObj = DateTime.fromISO(date || req.session.rideDate).setZone(TZ);
-  const dateStr = dateObj.toFormat('MMMM d, yyyy');
-  
-  const departureTime = time || `${req.session.departureTime.hours.toString().padStart(2, '0')}:${req.session.departureTime.minutes.toString().padStart(2, '0')}`;
-  
-  const directionStr = direction === 'FROM' ? 'from the settlement' : 'to the settlement';
   const unisexSeats = totalSeats - maleSeats - femaleSeats;
-  const seatsStr = `${totalSeats} total seat${totalSeats > 1 ? 's' : ''}: ${maleSeats} for males only, ${femaleSeats} for females only, and ${unisexSeats} unisex seats`;
   
+  // Play confirmation intro
   playPrompt(twiml, 'confirm_request_intro');
+  
+  // Play ride details using recordings
+  // Direction
+  if (direction === 'FROM') {
+    playPrompt(twiml, 'from_settlement');
+  } else {
+    playPrompt(twiml, 'to_settlement');
+  }
+  
+  // Time - play the departure time
+  if (time) {
+    playPrompt(twiml, 'at');
+    const timeStr = time.replace(':', '');
+    playHHMM(twiml, timeStr);
+  }
+  
+  // Seats - play seat breakdown
+  playDigits(twiml, totalSeats.toString());
+  playPrompt(twiml, 'seats');
   
   const gather = twiml.gather({
     input: 'dtmf',
@@ -1528,6 +1565,12 @@ voiceRouter.post('/driver-submit', async (req, res) => {
         
         // Tell the driver about the match
         playPrompt(twiml, 'great_news_found_ride');
+        
+        // Play rider's name if available (in English)
+        if (rider && rider.name) {
+          twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, rider.name);
+        }
+        
         // Read out the phone number digit by digit
         playPrompt(twiml, 'passenger_phone_number_is');
         {
@@ -1750,6 +1793,11 @@ voiceRouter.post('/ringback-start', async (req, res) => {
           // Tell the rider about the match
           playPrompt(twiml, 'great_news_found_ride');
           
+          // Play driver's name if available (in English)
+          if (driver && driver.name) {
+            twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, driver.name);
+          }
+          
           // Offer options
           const gather = twiml.gather({
             input: 'dtmf',
@@ -1794,6 +1842,11 @@ voiceRouter.post('/ringback-start', async (req, res) => {
           
           // Tell the driver about the match
           playPrompt(twiml, 'great_news_found_ride');
+          
+          // Play rider's name if available (in English)
+          if (rider && rider.name) {
+            twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, rider.name);
+          }
           
           // Offer options
           const gather = twiml.gather({
