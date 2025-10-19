@@ -58,9 +58,12 @@ export const PROMPT_IDS = {
   invalid_passenger_count: '095',
   session_expired_restart: '096',
   
-  // Driver-specific seat questions
-  driver_male_seats_question: '097',  // כמה מקומות לגברים יש לך?
-  driver_female_seats_question: '098', // כמה מקומות לנשים יש לך?
+  // Driver-specific seat questions (NEW FLOW: total → male-only → female-only → auto-calculate unisex)
+  driver_male_seats_question: '097',  // כמה מקומות לגברים יש לך? (DEPRECATED - kept for backwards compatibility)
+  driver_female_seats_question: '098', // כמה מקומות לנשים יש לך? (DEPRECATED - kept for backwards compatibility)
+  driver_total_seats_question: '099',  // כמה מקומות פנויים יש לך בסך הכל?
+  driver_male_only_from_total: '110',  // כמה מתוכם לגברים בלבד?
+  driver_female_only_from_total: '111', // כמה מתוכם לנשים בלבד?
 
   // Match / ringback
   great_news_found_ride: '100',
@@ -85,6 +88,7 @@ export const PROMPT_IDS = {
   from_settlement: '204',
   to_settlement: '205',
   passengers: '206',
+  
   seats: '207',
   must_travel_together: '208',
   can_travel_separately: '209',

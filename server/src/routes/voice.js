@@ -1106,7 +1106,7 @@ voiceRouter.post('/driver-departure-time', (req, res) => {
   res.type('text/xml').send(twiml.toString());
 });
 
-// Ask for seat availability
+// Ask for total seat availability
 voiceRouter.post('/driver-seats', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   
@@ -1114,21 +1114,72 @@ voiceRouter.post('/driver-seats', (req, res) => {
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/driver-male-seats'
+    action: '/voice/driver-total-seats'
   });
   playPrompt(gather, 'passenger_details_intro');
-  playPrompt(gather, 'driver_male_seats_question');
+  playPrompt(gather, 'driver_total_seats_question');
   playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
 });
 
-// Handle male-only seats and ask for female-only seats
+// Handle total seats and ask for male-only breakdown
+voiceRouter.post('/driver-total-seats', (req, res) => {
+  const twiml = new twilio.twiml.VoiceResponse();
+  const { Digits } = req.body;
+  req.session = req.session || {};
+  
+  // Validate input is a single digit
+  if (!/^\d$/.test(Digits)) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/driver-total-seats'
+    });
+    playPrompt(gather, 'driver_total_seats_question');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
+  const totalSeats = parseInt(Digits, 10);
+  
+  // Must have at least 1 seat
+  if (totalSeats === 0) {
+    playPrompt(twiml, 'need_at_least_one_passenger');
+    twiml.redirect('/voice/driver-seats');
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
+  // Store total seats
+  req.session.totalSeats = totalSeats;
+  
+  // Ask how many are male-only
+  const gather = twiml.gather({
+    input: 'dtmf',
+    numDigits: 1,
+    timeout: 10,
+    action: '/voice/driver-male-seats'
+  });
+  playPrompt(gather, 'driver_male_only_from_total');
+  playPrompt(twiml, 'no_input_goodbye');
+  twiml.hangup();
+  
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Handle male-only seats and ask for female-only seats (if needed)
 voiceRouter.post('/driver-male-seats', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  const totalSeats = req.session.totalSeats || 0;
   
   // Validate input is a single digit
   if (!/^\d$/.test(Digits)) {
@@ -1139,7 +1190,25 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
       timeout: 10,
       action: '/voice/driver-male-seats'
     });
-    playPrompt(gather, 'driver_male_seats_question');
+    playPrompt(gather, 'driver_male_only_from_total');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
+  const maleOnlySeats = parseInt(Digits, 10);
+  
+  // Validate: male-only can't exceed total
+  if (maleOnlySeats > totalSeats) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/driver-male-seats'
+    });
+    playPrompt(gather, 'driver_male_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
     twiml.hangup();
     res.type('text/xml').send(twiml.toString());
@@ -1147,27 +1216,40 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
   }
   
   // Store male-only seats
-  const maleOnlySeats = parseInt(Digits, 10);
   req.session.maleOnlySeats = maleOnlySeats;
   
+  // If all seats are male-only, skip female question and go directly to confirm
+  if (maleOnlySeats === totalSeats) {
+    req.session.femaleOnlySeats = 0;
+    req.session.unisexSeats = 0;
+    twiml.redirect('/voice/driver-confirm');
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
+  // Otherwise, ask for female-only seats
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
     action: '/voice/driver-female-seats'
   });
-  playPrompt(gather, 'driver_female_seats_question');
+  playPrompt(gather, 'driver_female_only_from_total');
   playPrompt(twiml, 'no_input_goodbye');
   twiml.hangup();
   
   res.type('text/xml').send(twiml.toString());
 });
 
-// Handle female-only seats and ask for unisex seats
+// Handle female-only seats and auto-calculate unisex seats
 voiceRouter.post('/driver-female-seats', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  const totalSeats = req.session.totalSeats || 0;
+  const maleOnlySeats = req.session.maleOnlySeats || 0;
+  const remainingSeats = totalSeats - maleOnlySeats;
   
   // Validate input is a single digit
   if (!/^\d$/.test(Digits)) {
@@ -1178,7 +1260,25 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
       timeout: 10,
       action: '/voice/driver-female-seats'
     });
-    playPrompt(gather, 'driver_female_seats_question');
+    playPrompt(gather, 'driver_female_only_from_total');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
+  const femaleOnlySeats = parseInt(Digits, 10);
+  
+  // Validate: female-only can't exceed remaining seats
+  if (femaleOnlySeats > remainingSeats) {
+    playPrompt(twiml, 'invalid_passenger_count');
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/driver-female-seats'
+    });
+    playPrompt(gather, 'driver_female_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
     twiml.hangup();
     res.type('text/xml').send(twiml.toString());
@@ -1186,57 +1286,14 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
   }
   
   // Store female-only seats
-  const femaleOnlySeats = parseInt(Digits, 10);
   req.session.femaleOnlySeats = femaleOnlySeats;
   
-  const gather = twiml.gather({
-    input: 'dtmf',
-    numDigits: 1,
-    timeout: 10,
-    action: '/voice/driver-unisex-seats'
-  });
-  playPrompt(gather, 'seats');
-  playPrompt(twiml, 'no_input_goodbye');
-  twiml.hangup();
-  
-  res.type('text/xml').send(twiml.toString());
-});
-
-// Handle unisex seats and confirm details
-voiceRouter.post('/driver-unisex-seats', (req, res) => {
-  const twiml = new twilio.twiml.VoiceResponse();
-  const { Digits } = req.body;
-  req.session = req.session || {};
-  
-  // Validate input is a single digit
-  if (!/^\d$/.test(Digits)) {
-    playPrompt(twiml, 'invalid_passenger_count');
-    const gather = twiml.gather({
-      input: 'dtmf',
-      numDigits: 1,
-      timeout: 10,
-      action: '/voice/driver-unisex-seats'
-    });
-    playPrompt(gather, 'seats');
-    playPrompt(twiml, 'no_input_goodbye');
-    twiml.hangup();
-    res.type('text/xml').send(twiml.toString());
-    return;
-  }
-  
-  // Store unisex seats
-  const unisexSeats = parseInt(Digits, 10);
+  // Auto-calculate unisex seats (remainder)
+  const unisexSeats = totalSeats - maleOnlySeats - femaleOnlySeats;
   req.session.unisexSeats = unisexSeats;
   
-  // Calculate total seats
-  const totalSeats = req.session.maleOnlySeats + req.session.femaleOnlySeats + unisexSeats;
-  
-  if (totalSeats === 0) {
-    playPrompt(twiml, 'need_at_least_one_passenger');
-    twiml.redirect('/voice/driver-seats');
-  } else {
-    twiml.redirect('/voice/driver-confirm');
-  }
+  // Go directly to confirmation
+  twiml.redirect('/voice/driver-confirm');
   
   res.type('text/xml').send(twiml.toString());
 });
