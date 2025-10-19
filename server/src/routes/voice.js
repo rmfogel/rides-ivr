@@ -320,11 +320,14 @@ voiceRouter.post('/rider-earliest-time', (req, res) => {
     // Store time in session
     req.session.earliestTime = { hours, minutes };
     
+    // Pass earliest time as query parameters to next step
+    const earliestTimeStr = `${hours.toString().padStart(2, '0')}${minutes.toString().padStart(2, '0')}`;
+    
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 4,
       timeout: 15,
-      action: '/voice/rider-latest-time'
+      action: `/voice/rider-latest-time?earliest=${earliestTimeStr}&date=${req.session.rideDate}&dir=${req.session.direction}`
     });
     playPrompt(gather, 'time_enter_latest');
     playPrompt(twiml, 'no_input_goodbye');
@@ -362,18 +365,24 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
       throw new Error('Invalid time values');
     }
     
-    // Make sure earliest time exists in session
-    if (!req.session.earliestTime || typeof req.session.earliestTime.hours === 'undefined') {
-      logger.error('Earliest time not found in session');
+    // Get earliest time from query params (more reliable than session in Twilio)
+    const earliestTimeStr = req.query.earliest;
+    if (!earliestTimeStr || earliestTimeStr.length !== 4) {
+      logger.error('Earliest time not found in query params');
       playPrompt(twiml, 'session_expired_restart');
       twiml.redirect('/voice/rider-new');
       res.type('text/xml').send(twiml.toString());
       return;
     }
     
-    // Make sure latest time is after or equal to earliest time
-    const earliestHours = req.session.earliestTime.hours;
-    const earliestMinutes = req.session.earliestTime.minutes;
+    // Parse earliest time from query string
+    const earliestHours = parseInt(earliestTimeStr.substring(0, 2), 10);
+    const earliestMinutes = parseInt(earliestTimeStr.substring(2, 4), 10);
+    
+    // Also restore session data
+    req.session.earliestTime = { hours: earliestHours, minutes: earliestMinutes };
+    req.session.rideDate = req.query.date;
+    req.session.direction = req.query.dir;
     
     if ((hours < earliestHours) || (hours === earliestHours && minutes < earliestMinutes)) {
       logger.info('Latest time validation failed', {
@@ -385,7 +394,7 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
         input: 'dtmf',
         numDigits: 4,
         timeout: 15,
-        action: '/voice/rider-latest-time'
+        action: `/voice/rider-latest-time?earliest=${earliestTimeStr}&date=${req.query.date}&dir=${req.query.dir}`
       });
       playPrompt(gather, 'time_enter_latest');
       playPrompt(twiml, 'no_input_goodbye');
