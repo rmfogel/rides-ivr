@@ -299,6 +299,9 @@ voiceRouter.post('/rider-earliest-time', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  
   try {
     if (!/^\d{4}$/.test(Digits)) throw new Error('Invalid time format');
     
@@ -313,13 +316,13 @@ voiceRouter.post('/rider-earliest-time', (req, res) => {
     req.session.earliestTime = { hours, minutes };
     
     // Pass earliest time as query parameters to next step
-    const earliestTimeStr = `${hours.toString().padStart(2, '0')}${minutes.toString().padStart(2, '0')}`;
+    const earliestTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 4,
       timeout: 15,
-      action: `/voice/rider-latest-time?earliest=${earliestTimeStr}&date=${req.session.rideDate}&dir=${req.session.direction}`
+      action: `/voice/rider-latest-time?earliest=${earliestTimeStr}&date=${date}&dir=${direction}`
     });
     playPrompt(gather, 'time_enter_latest');
     playPrompt(twiml, 'no_input_goodbye');
@@ -331,7 +334,7 @@ voiceRouter.post('/rider-earliest-time', (req, res) => {
       input: 'dtmf',
       numDigits: 4,
       timeout: 15,
-      action: '/voice/rider-earliest-time'
+      action: `/voice/rider-earliest-time?date=${date}&dir=${direction}`
     });
     playPrompt(gather, 'time_enter_earliest');
     playPrompt(twiml, 'no_input_goodbye');
