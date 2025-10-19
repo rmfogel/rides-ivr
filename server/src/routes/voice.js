@@ -280,11 +280,14 @@ voiceRouter.post('/rider-custom-date', (req, res) => {
 voiceRouter.post('/rider-time', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 4,
     timeout: 15,
-    action: '/voice/rider-earliest-time'
+    action: `/voice/rider-earliest-time?date=${date}&dir=${direction}`
   });
   playPrompt(gather, 'time_enter_earliest');
   playPrompt(twiml, 'no_input_goodbye');
@@ -848,8 +851,31 @@ voiceRouter.post('/rider-submit', async (req, res) => {
     try {
       const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
       
+      // Validate required params
+      if (!date || !direction || !earliest || !latest) {
+        logger.error('Missing required parameters in rider-submit', {
+          date,
+          direction,
+          earliest,
+          latest,
+          queryParams: req.query
+        });
+        playPrompt(twiml, 'session_expired_restart');
+        twiml.redirect('/voice/rider-new');
+        res.type('text/xml').send(twiml.toString());
+        return;
+      }
+      
       // Create date objects
       const rideDate = DateTime.fromISO(date).setZone(TZ);
+      
+      if (!rideDate.isValid) {
+        logger.error('Invalid date in rider-submit', { date, rideDate });
+        playPrompt(twiml, 'session_expired_restart');
+        twiml.redirect('/voice/rider-new');
+        res.type('text/xml').send(twiml.toString());
+        return;
+      }
       
       // Parse earliest time
       let earliestHours, earliestMinutes;
@@ -1510,8 +1536,30 @@ voiceRouter.post('/driver-submit', async (req, res) => {
     try {
       const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
       
+      // Validate required params
+      if (!date || !direction || !time) {
+        logger.error('Missing required parameters in driver-submit', {
+          date,
+          direction,
+          time,
+          queryParams: req.query
+        });
+        playPrompt(twiml, 'session_expired_restart');
+        twiml.redirect('/voice/driver-new');
+        res.type('text/xml').send(twiml.toString());
+        return;
+      }
+      
       // Create date objects
       const rideDate = DateTime.fromISO(date).setZone(TZ);
+      
+      if (!rideDate.isValid) {
+        logger.error('Invalid date in driver-submit', { date, rideDate });
+        playPrompt(twiml, 'session_expired_restart');
+        twiml.redirect('/voice/driver-new');
+        res.type('text/xml').send(twiml.toString());
+        return;
+      }
       
       // Parse time from query param or session
       let hours, minutes;
