@@ -324,28 +324,44 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
       throw new Error('Invalid time values');
     }
     
-    // Make sure latest time is after earliest time
+    // Make sure earliest time exists in session
+    if (!req.session.earliestTime || typeof req.session.earliestTime.hours === 'undefined') {
+      logger.error('Earliest time not found in session');
+      throw new Error('Session lost - earliest time missing');
+    }
+    
+    // Make sure latest time is after or equal to earliest time
     const earliestHours = req.session.earliestTime.hours;
     const earliestMinutes = req.session.earliestTime.minutes;
     
     if ((hours < earliestHours) || (hours === earliestHours && minutes < earliestMinutes)) {
+      logger.info('Latest time validation failed', {
+        latest: `${hours}:${minutes}`,
+        earliest: `${earliestHours}:${earliestMinutes}`
+      });
       throw new Error('Latest time must be after earliest time');
     }
     
     // Store time in session
     req.session.latestTime = { hours, minutes };
     
-    const gather = twiml.gather({
-      input: 'dtmf',
-      numDigits: 1,
-      timeout: 10,
-      action: '/voice/rider-preferred-time'
-    });
-    playPrompt(gather, 'preferred_time_question');
-    playPrompt(twiml, 'continue_without_preferred');
-    twiml.redirect('/voice/rider-passengers');
+    // If earliest and latest times are the same, skip preferred time and go straight to passengers
+    if (hours === earliestHours && minutes === earliestMinutes) {
+      logger.debug('Earliest and latest times are the same, skipping preferred time');
+      twiml.redirect('/voice/rider-passengers');
+    } else {
+      const gather = twiml.gather({
+        input: 'dtmf',
+        numDigits: 1,
+        timeout: 10,
+        action: '/voice/rider-preferred-time'
+      });
+      playPrompt(gather, 'preferred_time_question');
+      playPrompt(twiml, 'continue_without_preferred');
+      twiml.redirect('/voice/rider-passengers');
+    }
   } catch (error) {
-    console.error('Error processing latest time:', error);
+    logger.error('Error processing latest time:', error);
     playPrompt(twiml, 'invalid_time_try_again');
     twiml.redirect('/voice/rider-time');
   }
