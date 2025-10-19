@@ -398,29 +398,37 @@ voiceRouter.post('/rider-latest-time', (req, res) => {
     // Store time in session
     req.session.latestTime = { hours, minutes };
     
+    const date = req.query.date || req.session.rideDate || '';
+    const direction = req.query.dir || req.session.direction || '';
+    const earliestTimeQuery = req.query.earliest || '';
+    const latestTimeQuery = `${hours}:${minutes}`;
+    
     // If earliest and latest times are the same, skip preferred time and go straight to passengers
     if (hours === earliestHours && minutes === earliestMinutes) {
       logger.debug('Earliest and latest times are the same, skipping preferred time');
-      twiml.redirect('/voice/rider-passengers');
+      twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliestTimeQuery}&latest=${latestTimeQuery}`);
     } else {
       const gather = twiml.gather({
         input: 'dtmf',
         numDigits: 1,
         timeout: 10,
-        action: '/voice/rider-preferred-time'
+        action: `/voice/rider-preferred-time?date=${date}&dir=${direction}&earliest=${earliestTimeQuery}&latest=${latestTimeQuery}`
       });
       playPrompt(gather, 'preferred_time_question');
       playPrompt(twiml, 'continue_without_preferred');
-      twiml.redirect('/voice/rider-passengers');
+      twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliestTimeQuery}&latest=${latestTimeQuery}`);
     }
   } catch (error) {
     logger.error('Error processing latest time:', error);
+    const date = req.query.date || '';
+    const direction = req.query.dir || '';
+    const earliestTimeQuery = req.query.earliest || '';
     playPrompt(twiml, 'invalid_time_format');
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 4,
       timeout: 15,
-      action: '/voice/rider-latest-time'
+      action: `/voice/rider-latest-time?earliest=${earliestTimeQuery}&date=${date}&dir=${direction}`
     });
     playPrompt(gather, 'time_enter_latest');
     playPrompt(twiml, 'no_input_goodbye');
@@ -436,20 +444,25 @@ voiceRouter.post('/rider-preferred-time', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  
   if (Digits === '1') {
     // User wants to enter preferred time
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 4,
       timeout: 15,
-      action: '/voice/rider-preferred-time-entry'
+      action: `/voice/rider-preferred-time-entry?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}`
     });
     playPrompt(gather, 'preferred_time_enter');
     playPrompt(twiml, 'continue_without_preferred');
-    twiml.redirect('/voice/rider-passengers');
+    twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}`);
   } else {
     // No preferred time or chose not to enter one
-    twiml.redirect('/voice/rider-passengers');
+    twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}`);
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -460,6 +473,11 @@ voiceRouter.post('/rider-preferred-time-entry', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
   
   try {
     if (!/^\d{4}$/.test(Digits)) throw new Error('Invalid time format');
@@ -486,23 +504,24 @@ voiceRouter.post('/rider-preferred-time-entry', (req, res) => {
         input: 'dtmf',
         numDigits: 4,
         timeout: 15,
-        action: '/voice/rider-preferred-time-entry'
+        action: `/voice/rider-preferred-time-entry?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}`
       });
       playPrompt(gather, 'preferred_time_enter');
       playPrompt(twiml, 'continue_without_preferred');
-      twiml.redirect('/voice/rider-passengers');
+      twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}`);
       res.type('text/xml').send(twiml.toString());
       return;
     }
     
     // Store time in session
     req.session.preferredTime = { hours, minutes };
-    twiml.redirect('/voice/rider-passengers');
+    const preferred = `${hours}:${minutes}`;
+    twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}`);
   } catch (error) {
     console.error('Error processing preferred time:', error);
     playPrompt(twiml, 'invalid_time_format');
     playPrompt(twiml, 'continue_without_preferred');
-    twiml.redirect('/voice/rider-passengers');
+    twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}`);
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -512,11 +531,17 @@ voiceRouter.post('/rider-preferred-time-entry', (req, res) => {
 voiceRouter.post('/rider-passengers', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  const preferred = req.query.preferred || '';
+  
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/rider-male-count'
+    action: `/voice/rider-male-count?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}`
   });
   playPrompt(gather, 'passenger_details_intro');
   playPrompt(gather, 'how_many_males');
@@ -532,6 +557,12 @@ voiceRouter.post('/rider-male-count', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  const preferred = req.query.preferred || '';
+  
   // Validate input is a single digit
   if (!/^\d$/.test(Digits)) {
     playPrompt(twiml, 'invalid_passenger_count');
@@ -539,7 +570,7 @@ voiceRouter.post('/rider-male-count', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/rider-male-count'
+      action: `/voice/rider-male-count?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}`
     });
     playPrompt(gather, 'how_many_males');
     playPrompt(twiml, 'no_input_goodbye');
@@ -556,7 +587,7 @@ voiceRouter.post('/rider-male-count', (req, res) => {
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/rider-female-count'
+    action: `/voice/rider-female-count?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}`
   });
   playPrompt(gather, 'how_many_females');
   playPrompt(twiml, 'no_input_goodbye');
@@ -571,6 +602,13 @@ voiceRouter.post('/rider-female-count', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  const preferred = req.query.preferred || '';
+  const maleCount = parseInt(req.query.male) || req.session.maleCount || 0;
+  
   // Validate input is a single digit
   if (!/^\d$/.test(Digits)) {
     playPrompt(twiml, 'invalid_passenger_count');
@@ -578,7 +616,7 @@ voiceRouter.post('/rider-female-count', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/rider-female-count'
+      action: `/voice/rider-female-count?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}`
     });
     playPrompt(gather, 'how_many_females');
     playPrompt(twiml, 'no_input_goodbye');
@@ -592,25 +630,25 @@ voiceRouter.post('/rider-female-count', (req, res) => {
   req.session.femaleCount = femaleCount;
   
   // Calculate total passengers
-  const totalCount = req.session.maleCount + femaleCount;
+  const totalCount = maleCount + femaleCount;
   
   if (totalCount === 0) {
     playPrompt(twiml, 'need_at_least_one_passenger');
-    twiml.redirect('/voice/rider-passengers');
+    twiml.redirect(`/voice/rider-passengers?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}`);
   } else if (totalCount >= 2) {
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/rider-couples-count'
+      action: `/voice/rider-couples-count?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}`
     });
     playPrompt(gather, 'couples_how_many');
     playPrompt(twiml, 'continue_without_preferred');
-    twiml.redirect('/voice/rider-together');
+    twiml.redirect(`/voice/rider-together?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=0`);
   } else {
     // Only one passenger, no couples
     req.session.couplesCount = 0;
-    twiml.redirect('/voice/rider-together');
+    twiml.redirect(`/voice/rider-together?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=0`);
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -622,6 +660,14 @@ voiceRouter.post('/rider-couples-count', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  const preferred = req.query.preferred || '';
+  const maleCount = parseInt(req.query.male) || req.session.maleCount || 0;
+  const femaleCount = parseInt(req.query.female) || req.session.femaleCount || 0;
+  
   // Validate input is a single digit
   if (!/^\d$/.test(Digits)) {
     playPrompt(twiml, 'invalid_passenger_count');
@@ -629,18 +675,18 @@ voiceRouter.post('/rider-couples-count', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/rider-couples-count'
+      action: `/voice/rider-couples-count?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}`
     });
     playPrompt(gather, 'couples_how_many');
     playPrompt(twiml, 'continue_without_preferred');
-    twiml.redirect('/voice/rider-together');
+    twiml.redirect(`/voice/rider-together?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=0`);
     res.type('text/xml').send(twiml.toString());
     return;
   }
   
   // Store couples count
   const couplesCount = parseInt(Digits, 10);
-  const totalCount = req.session.maleCount + req.session.femaleCount;
+  const totalCount = maleCount + femaleCount;
   
   // Validate couples count
   if (couplesCount * 2 > totalCount) {
@@ -649,14 +695,14 @@ voiceRouter.post('/rider-couples-count', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/rider-couples-count'
+      action: `/voice/rider-couples-count?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}`
     });
     playPrompt(gather, 'couples_how_many');
     playPrompt(twiml, 'continue_without_preferred');
-    twiml.redirect('/voice/rider-together');
+    twiml.redirect(`/voice/rider-together?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=0`);
   } else {
     req.session.couplesCount = couplesCount;
-    twiml.redirect('/voice/rider-together');
+    twiml.redirect(`/voice/rider-together?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=${couplesCount}`);
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -667,25 +713,33 @@ voiceRouter.post('/rider-together', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   req.session = req.session || {};
   
-  const totalCount = req.session.maleCount + req.session.femaleCount;
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  const preferred = req.query.preferred || '';
+  const maleCount = parseInt(req.query.male) || req.session.maleCount || 0;
+  const femaleCount = parseInt(req.query.female) || req.session.femaleCount || 0;
+  const couplesCount = parseInt(req.query.couples) || req.session.couplesCount || 0;
+  const totalCount = maleCount + femaleCount;
   
   if (totalCount > 1) {
     const gather = twiml.gather({
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/rider-confirm'
+      action: `/voice/rider-confirm?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=${couplesCount}`
     });
   playPrompt(gather, 'together_question');
   playPrompt(twiml, 'assuming_together');
     
     // Default to together if no input
     req.session.together = true;
-    twiml.redirect('/voice/rider-confirm');
+    twiml.redirect(`/voice/rider-confirm?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=${couplesCount}&together=1`);
   } else {
     // Only one passenger, must travel together
     req.session.together = true;
-    twiml.redirect('/voice/rider-confirm');
+    twiml.redirect(`/voice/rider-confirm?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=${couplesCount}&together=1`);
   }
   
   res.type('text/xml').send(twiml.toString());
@@ -697,26 +751,39 @@ voiceRouter.post('/rider-confirm', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  const preferred = req.query.preferred || '';
+  const maleCount = parseInt(req.query.male) || req.session.maleCount || 0;
+  const femaleCount = parseInt(req.query.female) || req.session.femaleCount || 0;
+  const couplesCount = parseInt(req.query.couples) || req.session.couplesCount || 0;
+  const together = req.query.together === '1' || req.query.together === '2' ? req.query.together : '1';
+  
   // Process "must travel together" input if it was provided
   if (Digits) {
     req.session.together = (Digits === '1');
+  } else if (together) {
+    req.session.together = (together === '1');
   }
   
   // Generate summary for confirmation
-  const dateObj = DateTime.fromISO(req.session.rideDate).setZone(TZ);
+  const dateObj = DateTime.fromISO(date || req.session.rideDate).setZone(TZ);
   const dateStr = dateObj.toFormat('MMMM d, yyyy');
   
-  const earlyTime = `${req.session.earliestTime.hours.toString().padStart(2, '0')}:${req.session.earliestTime.minutes.toString().padStart(2, '0')}`;
-  const lateTime = `${req.session.latestTime.hours.toString().padStart(2, '0')}:${req.session.latestTime.minutes.toString().padStart(2, '0')}`;
+  const earlyTime = earliest || `${req.session.earliestTime.hours.toString().padStart(2, '0')}:${req.session.earliestTime.minutes.toString().padStart(2, '0')}`;
+  const lateTime = latest || `${req.session.latestTime.hours.toString().padStart(2, '0')}:${req.session.latestTime.minutes.toString().padStart(2, '0')}`;
   
   let preferredTimeStr = '';
-  if (req.session.preferredTime) {
-    preferredTimeStr = ` with preferred time of ${req.session.preferredTime.hours.toString().padStart(2, '0')}:${req.session.preferredTime.minutes.toString().padStart(2, '0')}`;
+  if (preferred || req.session.preferredTime) {
+    const prefTime = preferred || `${req.session.preferredTime.hours.toString().padStart(2, '0')}:${req.session.preferredTime.minutes.toString().padStart(2, '0')}`;
+    preferredTimeStr = ` with preferred time of ${prefTime}`;
   }
   
-  const directionStr = req.session.direction === 'FROM' ? 'from the settlement' : 'to the settlement';
-  const totalCount = req.session.maleCount + req.session.femaleCount;
-  const passengersStr = `${totalCount} passenger${totalCount > 1 ? 's' : ''}: ${req.session.maleCount} male, ${req.session.femaleCount} female, including ${req.session.couplesCount} couple${req.session.couplesCount !== 1 ? 's' : ''}`;
+  const directionStr = direction === 'FROM' ? 'from the settlement' : 'to the settlement';
+  const totalCount = maleCount + femaleCount;
+  const passengersStr = `${totalCount} passenger${totalCount > 1 ? 's' : ''}: ${maleCount} male, ${femaleCount} female, including ${couplesCount} couple${couplesCount !== 1 ? 's' : ''}`;
   const togetherStr = req.session.together ? 'Passengers must travel together' : 'Passengers can travel separately';
   
   playPrompt(twiml, 'confirm_request_intro');
@@ -725,7 +792,7 @@ voiceRouter.post('/rider-confirm', (req, res) => {
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/rider-submit'
+    action: `/voice/rider-submit?date=${date}&dir=${direction}&earliest=${earliest}&latest=${latest}&preferred=${preferred}&male=${maleCount}&female=${femaleCount}&couples=${couplesCount}&together=${together}`
   });
   playPrompt(gather, 'press_1_confirm_2_restart');
   playPrompt(twiml, 'no_input_goodbye');
@@ -740,29 +807,66 @@ voiceRouter.post('/rider-submit', async (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const earliest = req.query.earliest || '';
+  const latest = req.query.latest || '';
+  const preferred = req.query.preferred || '';
+  const maleCount = parseInt(req.query.male) || req.session.maleCount || 0;
+  const femaleCount = parseInt(req.query.female) || req.session.femaleCount || 0;
+  const couplesCount = parseInt(req.query.couples) || req.session.couplesCount || 0;
+  const together = req.query.together === '1';
+  
   if (Digits === '1') {
     try {
       const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
       
       // Create date objects
-      const rideDate = DateTime.fromISO(req.session.rideDate).setZone(TZ);
+      const rideDate = DateTime.fromISO(date).setZone(TZ);
+      
+      // Parse earliest time
+      let earliestHours, earliestMinutes;
+      if (earliest && earliest.includes(':')) {
+        [earliestHours, earliestMinutes] = earliest.split(':').map(t => parseInt(t, 10));
+      } else {
+        earliestHours = req.session.earliestTime?.hours || 0;
+        earliestMinutes = req.session.earliestTime?.minutes || 0;
+      }
       
       const earliestDateTime = rideDate.set({
-        hour: req.session.earliestTime.hours,
-        minute: req.session.earliestTime.minutes,
+        hour: earliestHours,
+        minute: earliestMinutes,
         second: 0,
         millisecond: 0
       });
+      
+      // Parse latest time
+      let latestHours, latestMinutes;
+      if (latest && latest.includes(':')) {
+        [latestHours, latestMinutes] = latest.split(':').map(t => parseInt(t, 10));
+      } else {
+        latestHours = req.session.latestTime?.hours || 0;
+        latestMinutes = req.session.latestTime?.minutes || 0;
+      }
       
       const latestDateTime = rideDate.set({
-        hour: req.session.latestTime.hours,
-        minute: req.session.latestTime.minutes,
+        hour: latestHours,
+        minute: latestMinutes,
         second: 0,
         millisecond: 0
       });
       
+      // Parse preferred time if exists
       let preferredDateTime = null;
-      if (req.session.preferredTime) {
+      if (preferred && preferred.includes(':')) {
+        const [preferredHours, preferredMinutes] = preferred.split(':').map(t => parseInt(t, 10));
+        preferredDateTime = rideDate.set({
+          hour: preferredHours,
+          minute: preferredMinutes,
+          second: 0,
+          millisecond: 0
+        });
+      } else if (req.session.preferredTime) {
         preferredDateTime = rideDate.set({
           hour: req.session.preferredTime.hours,
           minute: req.session.preferredTime.minutes,
@@ -774,14 +878,14 @@ voiceRouter.post('/rider-submit', async (req, res) => {
       // Create the ride request
       const rideRequest = {
         rider_phone: from,
-        direction: req.session.direction,
+        direction: direction,
         earliest_time: earliestDateTime.toJSDate(),
         latest_time: latestDateTime.toJSDate(),
-        passengers_male: req.session.maleCount,
-        passengers_female: req.session.femaleCount,
-        passengers_total: req.session.maleCount + req.session.femaleCount,
-        couples_count: req.session.couplesCount,
-        together: req.session.together
+        passengers_male: maleCount,
+        passengers_female: femaleCount,
+        passengers_total: maleCount + femaleCount,
+        couples_count: couplesCount,
+        together: together || req.session.together
       };
       
       if (preferredDateTime) {
@@ -902,10 +1006,10 @@ voiceRouter.post('/driver-direction', (req, res) => {
   
   if (Digits === '1') {
     req.session.direction = 'FROM';
-    twiml.redirect('/voice/driver-date');
+    twiml.redirect('/voice/driver-date?dir=FROM');
   } else if (Digits === '2') {
     req.session.direction = 'TO';
-    twiml.redirect('/voice/driver-date');
+    twiml.redirect('/voice/driver-date?dir=TO');
   } else {
     // Clear error message and retry
     playPrompt(twiml, 'invalid_direction_retry');
@@ -927,11 +1031,14 @@ voiceRouter.post('/driver-direction', (req, res) => {
 voiceRouter.post('/driver-date', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   
+  // Get direction from query params or session
+  const direction = req.query.dir || (req.session && req.session.direction) || '';
+  
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 6,
-    action: '/voice/driver-date-choice'
+    action: `/voice/driver-date-choice?dir=${direction}`
   });
   playPrompt(gather, 'date_choice_prompt');
   playPrompt(twiml, 'no_input_goodbye');
@@ -946,17 +1053,21 @@ voiceRouter.post('/driver-date-choice', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  // Get direction from query params
+  const direction = req.query.dir || req.session.direction || '';
+  req.session.direction = direction;
+  
   if (Digits === '1' || Digits === '2') {
     // Today or tomorrow
     try {
       const now = DateTime.now().setZone(TZ);
       const date = Digits === '1' ? now : now.plus({ days: 1 });
       req.session.rideDate = date.toISODate();
-      twiml.redirect('/voice/driver-time');
+      twiml.redirect(`/voice/driver-time?date=${date.toISODate()}&dir=${direction}`);
     } catch (error) {
       console.error('Error setting date:', error);
       playPrompt(twiml, 'error_generic_try_later');
-      twiml.redirect('/voice/driver-date');
+      twiml.redirect(`/voice/driver-date?dir=${direction}`);
     }
   } else if (Digits === '3') {
     // Custom date
@@ -964,11 +1075,11 @@ voiceRouter.post('/driver-date-choice', (req, res) => {
       input: 'dtmf',
       numDigits: 6,
       timeout: 15,
-      action: '/voice/driver-custom-date'
+      action: `/voice/driver-custom-date?dir=${direction}`
     });
     playPrompt(gather, 'enter_date_six_digits');
     playPrompt(twiml, 'invalid_date_try_again');
-    twiml.redirect('/voice/driver-date');
+    twiml.redirect(`/voice/driver-date?dir=${direction}`);
   } else {
     // Invalid choice - retry with clear message
     playPrompt(twiml, 'invalid_date_option_retry');
@@ -976,7 +1087,7 @@ voiceRouter.post('/driver-date-choice', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 6,
-      action: '/voice/driver-date-choice'
+      action: `/voice/driver-date-choice?dir=${direction}`
     });
     playPrompt(gather, 'date_choice_prompt');
     playPrompt(twiml, 'no_input_goodbye');
@@ -991,6 +1102,10 @@ voiceRouter.post('/driver-custom-date', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const { Digits } = req.body;
   req.session = req.session || {};
+  
+  // Get direction from query params
+  const direction = req.query.dir || req.session.direction || '';
+  req.session.direction = direction;
   
   try {
     if (!/^\d{6}$/.test(Digits)) throw new Error('Invalid date format');
@@ -1008,7 +1123,7 @@ voiceRouter.post('/driver-custom-date', (req, res) => {
     if (date < now) throw new Error('Date is in the past');
     
     req.session.rideDate = date.toISODate();
-    twiml.redirect('/voice/driver-time');
+    twiml.redirect(`/voice/driver-time?date=${date.toISODate()}&dir=${direction}`);
   } catch (error) {
     console.error('Error processing custom date:', error);
     playPrompt(twiml, 'invalid_date_try_again');
@@ -1016,7 +1131,7 @@ voiceRouter.post('/driver-custom-date', (req, res) => {
       input: 'dtmf',
       numDigits: 6,
       timeout: 15,
-      action: '/voice/driver-custom-date'
+      action: `/voice/driver-custom-date?dir=${direction}`
     });
     playPrompt(gather, 'enter_date_six_digits');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1029,12 +1144,14 @@ voiceRouter.post('/driver-custom-date', (req, res) => {
 // Ask for departure time
 voiceRouter.post('/driver-time', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
   
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 4,
     timeout: 15,
-    action: '/voice/driver-departure-time'
+    action: `/voice/driver-departure-time?date=${date}&dir=${direction}`
   });
   playPrompt(gather, 'time_enter_departure');
   playPrompt(twiml, 'no_input_goodbye');
@@ -1049,6 +1166,9 @@ voiceRouter.post('/driver-departure-time', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  
   try {
     if (!/^\d{4}$/.test(Digits)) throw new Error('Invalid time format');
     
@@ -1061,7 +1181,7 @@ voiceRouter.post('/driver-departure-time', (req, res) => {
     
     // Store time in session
     req.session.departureTime = { hours, minutes };
-    twiml.redirect('/voice/driver-seats');
+    twiml.redirect(`/voice/driver-seats?date=${date}&dir=${direction}&time=${hours}:${minutes}`);
   } catch (error) {
     console.error('Error processing departure time:', error);
     playPrompt(twiml, 'invalid_time_format');
@@ -1069,7 +1189,7 @@ voiceRouter.post('/driver-departure-time', (req, res) => {
       input: 'dtmf',
       numDigits: 4,
       timeout: 15,
-      action: '/voice/driver-departure-time'
+      action: `/voice/driver-departure-time?date=${date}&dir=${direction}`
     });
     playPrompt(gather, 'time_enter_departure');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1082,12 +1202,15 @@ voiceRouter.post('/driver-departure-time', (req, res) => {
 // Ask for total seat availability
 voiceRouter.post('/driver-seats', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const time = req.query.time || '';
   
   const gather = twiml.gather({
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/driver-total-seats'
+    action: `/voice/driver-total-seats?date=${date}&dir=${direction}&time=${time}`
   });
   playPrompt(gather, 'passenger_details_intro');
   playPrompt(gather, 'driver_total_seats_question');
@@ -1103,6 +1226,10 @@ voiceRouter.post('/driver-total-seats', (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const time = req.query.time || '';
+  
   // Validate input exists and is a single digit
   if (!Digits || !/^\d$/.test(Digits)) {
     playPrompt(twiml, 'invalid_passenger_count');
@@ -1110,7 +1237,7 @@ voiceRouter.post('/driver-total-seats', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: '/voice/driver-total-seats'
+      action: `/voice/driver-total-seats?date=${date}&dir=${direction}&time=${time}`
     });
     playPrompt(gather, 'driver_total_seats_question');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1124,7 +1251,7 @@ voiceRouter.post('/driver-total-seats', (req, res) => {
   // Must have at least 1 seat
   if (totalSeats === 0) {
     playPrompt(twiml, 'need_at_least_one_passenger');
-    twiml.redirect('/voice/driver-seats');
+    twiml.redirect(`/voice/driver-seats?date=${date}&dir=${direction}&time=${time}`);
     res.type('text/xml').send(twiml.toString());
     return;
   }
@@ -1137,7 +1264,7 @@ voiceRouter.post('/driver-total-seats', (req, res) => {
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: `/voice/driver-male-seats?total=${totalSeats}`
+    action: `/voice/driver-male-seats?total=${totalSeats}&date=${date}&dir=${direction}&time=${time}`
   });
   playPrompt(gather, 'driver_male_only_from_total');
   playPrompt(twiml, 'no_input_goodbye');
@@ -1154,6 +1281,9 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
   
   // Get total from query params or session
   const totalSeats = parseInt(req.query.total) || req.session.totalSeats || 0;
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const time = req.query.time || '';
   
   // Validate input exists and is a single digit
   if (!Digits || !/^\d$/.test(Digits)) {
@@ -1162,7 +1292,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: `/voice/driver-male-seats?total=${totalSeats}`
+      action: `/voice/driver-male-seats?total=${totalSeats}&date=${date}&dir=${direction}&time=${time}`
     });
     playPrompt(gather, 'driver_male_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1180,7 +1310,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: `/voice/driver-male-seats?total=${totalSeats}`
+      action: `/voice/driver-male-seats?total=${totalSeats}&date=${date}&dir=${direction}&time=${time}`
     });
     playPrompt(gather, 'driver_male_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1197,7 +1327,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
     req.session.femaleOnlySeats = 0;
     req.session.unisexSeats = 0;
     req.session.totalSeats = totalSeats;
-    twiml.redirect(`/voice/driver-confirm?total=${totalSeats}&male=${maleOnlySeats}&female=0`);
+    twiml.redirect(`/voice/driver-confirm?total=${totalSeats}&male=${maleOnlySeats}&female=0&date=${date}&dir=${direction}&time=${time}`);
     res.type('text/xml').send(twiml.toString());
     return;
   }
@@ -1207,7 +1337,7 @@ voiceRouter.post('/driver-male-seats', (req, res) => {
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}`
+    action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}&date=${date}&dir=${direction}&time=${time}`
   });
   playPrompt(gather, 'driver_female_only_from_total');
   playPrompt(twiml, 'no_input_goodbye');
@@ -1226,6 +1356,9 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
   const totalSeats = parseInt(req.query.total) || req.session.totalSeats || 0;
   const maleOnlySeats = parseInt(req.query.male) || req.session.maleOnlySeats || 0;
   const remainingSeats = totalSeats - maleOnlySeats;
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const time = req.query.time || '';
   
   // Validate input exists and is a single digit
   if (!Digits || !/^\d$/.test(Digits)) {
@@ -1234,7 +1367,7 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}`
+      action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}&date=${date}&dir=${direction}&time=${time}`
     });
     playPrompt(gather, 'driver_female_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1252,7 +1385,7 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
       input: 'dtmf',
       numDigits: 1,
       timeout: 10,
-      action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}`
+      action: `/voice/driver-female-seats?total=${totalSeats}&male=${maleOnlySeats}&date=${date}&dir=${direction}&time=${time}`
     });
     playPrompt(gather, 'driver_female_only_from_total');
     playPrompt(twiml, 'no_input_goodbye');
@@ -1271,7 +1404,7 @@ voiceRouter.post('/driver-female-seats', (req, res) => {
   req.session.maleOnlySeats = maleOnlySeats;
   
   // Go directly to confirmation
-  twiml.redirect(`/voice/driver-confirm?total=${totalSeats}&male=${maleOnlySeats}&female=${femaleOnlySeats}`);
+  twiml.redirect(`/voice/driver-confirm?total=${totalSeats}&male=${maleOnlySeats}&female=${femaleOnlySeats}&date=${date}&dir=${direction}&time=${time}`);
   
   res.type('text/xml').send(twiml.toString());
 });
@@ -1281,15 +1414,23 @@ voiceRouter.post('/driver-confirm', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   req.session = req.session || {};
   
+  // Get values from query params or session
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const time = req.query.time || '';
+  const totalSeats = parseInt(req.query.total) || req.session.totalSeats || 0;
+  const maleSeats = parseInt(req.query.male) || req.session.maleOnlySeats || 0;
+  const femaleSeats = parseInt(req.query.female) || req.session.femaleOnlySeats || 0;
+  
   // Generate summary for confirmation
-  const dateObj = DateTime.fromISO(req.session.rideDate).setZone(TZ);
+  const dateObj = DateTime.fromISO(date || req.session.rideDate).setZone(TZ);
   const dateStr = dateObj.toFormat('MMMM d, yyyy');
   
-  const departureTime = `${req.session.departureTime.hours.toString().padStart(2, '0')}:${req.session.departureTime.minutes.toString().padStart(2, '0')}`;
+  const departureTime = time || `${req.session.departureTime.hours.toString().padStart(2, '0')}:${req.session.departureTime.minutes.toString().padStart(2, '0')}`;
   
-  const directionStr = req.session.direction === 'FROM' ? 'from the settlement' : 'to the settlement';
-  const totalSeats = req.session.maleOnlySeats + req.session.femaleOnlySeats + req.session.unisexSeats;
-  const seatsStr = `${totalSeats} total seat${totalSeats > 1 ? 's' : ''}: ${req.session.maleOnlySeats} for males only, ${req.session.femaleOnlySeats} for females only, and ${req.session.unisexSeats} unisex seats`;
+  const directionStr = direction === 'FROM' ? 'from the settlement' : 'to the settlement';
+  const unisexSeats = totalSeats - maleSeats - femaleSeats;
+  const seatsStr = `${totalSeats} total seat${totalSeats > 1 ? 's' : ''}: ${maleSeats} for males only, ${femaleSeats} for females only, and ${unisexSeats} unisex seats`;
   
   playPrompt(twiml, 'confirm_request_intro');
   
@@ -1297,7 +1438,7 @@ voiceRouter.post('/driver-confirm', (req, res) => {
     input: 'dtmf',
     numDigits: 1,
     timeout: 10,
-    action: '/voice/driver-submit'
+    action: `/voice/driver-submit?date=${date}&dir=${direction}&time=${time}&total=${totalSeats}&male=${maleSeats}&female=${femaleSeats}`
   });
   playPrompt(gather, 'press_1_confirm_2_restart');
   playPrompt(twiml, 'no_input_goodbye');
@@ -1312,16 +1453,34 @@ voiceRouter.post('/driver-submit', async (req, res) => {
   const { Digits } = req.body;
   req.session = req.session || {};
   
+  // Get values from query params or session
+  const date = req.query.date || req.session.rideDate || '';
+  const direction = req.query.dir || req.session.direction || '';
+  const time = req.query.time || '';
+  const totalSeats = parseInt(req.query.total) || req.session.totalSeats || 0;
+  const maleSeats = parseInt(req.query.male) || req.session.maleOnlySeats || 0;
+  const femaleSeats = parseInt(req.query.female) || req.session.femaleOnlySeats || 0;
+  const unisexSeats = totalSeats - maleSeats - femaleSeats;
+  
   if (Digits === '1') {
     try {
       const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
       
       // Create date objects
-      const rideDate = DateTime.fromISO(req.session.rideDate).setZone(TZ);
+      const rideDate = DateTime.fromISO(date).setZone(TZ);
+      
+      // Parse time from query param or session
+      let hours, minutes;
+      if (time && time.includes(':')) {
+        [hours, minutes] = time.split(':').map(t => parseInt(t, 10));
+      } else {
+        hours = req.session.departureTime?.hours || 0;
+        minutes = req.session.departureTime?.minutes || 0;
+      }
       
       const departureDateTime = rideDate.set({
-        hour: req.session.departureTime.hours,
-        minute: req.session.departureTime.minutes,
+        hour: hours,
+        minute: minutes,
         second: 0,
         millisecond: 0
       });
@@ -1329,11 +1488,11 @@ voiceRouter.post('/driver-submit', async (req, res) => {
       // Create the ride offer
       const rideOffer = {
         driver_phone: from,
-        direction: req.session.direction,
+        direction: direction,
         departure_time: departureDateTime.toJSDate(),
-        seats_male_only: req.session.maleOnlySeats,
-        seats_female_only: req.session.femaleOnlySeats,
-        seats_unisex: req.session.unisexSeats
+        seats_male_only: maleSeats,
+        seats_female_only: femaleSeats,
+        seats_unisex: unisexSeats
       };
       
       // Add the offer to the database
