@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS ride_offers (
   departure_time TIMESTAMPTZ NOT NULL,
   seats_male_only INT NOT NULL DEFAULT 0,
   seats_female_only INT NOT NULL DEFAULT 0,
-  seats_unisex INT NOT NULL DEFAULT 0,
+  seats_anygender INT NOT NULL DEFAULT 0,
   status VARCHAR(10) NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','cancelled','filled')),
   created_at TIMESTAMPTZ DEFAULT now(),
   expires_at TIMESTAMPTZ
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS matches (
   allocated_couples INT NOT NULL DEFAULT 0,
   allocated_male INT NOT NULL DEFAULT 0,
   allocated_female INT NOT NULL DEFAULT 0,
-  allocated_unisex INT NOT NULL DEFAULT 0,
+  allocated_anygender INT NOT NULL DEFAULT 0,
   status VARCHAR(12) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','notified','connected','confirmed','declined','expired')),
   notified_via VARCHAR(10) DEFAULT 'ringback',
   hold_expires_at TIMESTAMPTZ,

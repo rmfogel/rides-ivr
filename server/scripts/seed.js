@@ -31,7 +31,7 @@ async function main() {
     departure_time: dep.toUTC().toISO(),
     seats_male_only: 1,
     seats_female_only: 1,
-    seats_unisex: 2,
+    seats_anygender: 2,
   });
 
   // A request overlapping the offer
@@ -56,7 +56,7 @@ async function main() {
     allocated_couples: 0,
     allocated_male: 1,
     allocated_female: 1,
-    allocated_unisex: 0,
+    allocated_anygender: 0,
     status: 'pending',
   });
 

@@ -201,7 +201,7 @@ npm run tts:he           # Old TTS script
 1. Direction (from/to settlement)
 2. Date selection
 3. Departure time
-4. Seat availability (male/female/unisex)
+4. Seat availability (male/female/anygender)
 5. Confirmation
 6. Immediate matching if rider available
 
@@ -230,7 +230,7 @@ Located in `src/engine/matching.js`:
 
 **`offers`** - Driver offers
 - driver_phone, direction, departure_time
-- seats (male_only/female_only/unisex)
+- seats (male_only/female_only/anygender)
 - status: open/matched/cancelled
 
 **`matches`** - Potential matches

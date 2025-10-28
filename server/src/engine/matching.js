@@ -3,17 +3,17 @@ import { ringbackRider, ringbackDriver } from "../notify/ringback.js";
 import logger from "../utils/logger.js";
 
 function allocFromOffer(seats, need, allowSameGenderCouple=false, together=false) {
-  // seats: { male_only, female_only, unisex }  // need: { couples, males, females }
+  // seats: { male_only, female_only, anygender }  // need: { couples, males, females, children }
   // res fields represent seat-type usage for this allocation
-  const res = { allocated_couples: 0, allocated_male: 0, allocated_female: 0, allocated_unisex: 0 };
+  const res = { allocated_couples: 0, allocated_male: 0, allocated_female: 0, allocated_anygender: 0, allocated_children: 0 };
   const s = { ...seats };
   const n = { ...need };
 
   const tryAllocCouple = () => {
     // one male-only + one female-only
     if (s.male_only > 0 && s.female_only > 0) { s.male_only--; s.female_only--; res.allocated_couples++; res.allocated_male++; res.allocated_female++; return true; }
-    // or two unisex seats
-    if (s.unisex >= 2) { s.unisex -= 2; res.allocated_couples++; res.allocated_unisex += 2; return true; }
+    // or two anygender seats
+    if (s.anygender >= 2) { s.anygender -= 2; res.allocated_couples++; res.allocated_anygender += 2; return true; }
     // same-gender couple fallback (normally disabled)
     if (allowSameGenderCouple && s.male_only >= 2) { s.male_only -= 2; res.allocated_couples++; res.allocated_male += 2; return true; }
     if (allowSameGenderCouple && s.female_only >= 2) { s.female_only -= 2; res.allocated_couples++; res.allocated_female += 2; return true; }
@@ -22,13 +22,21 @@ function allocFromOffer(seats, need, allowSameGenderCouple=false, together=false
 
   const tryAllocMale = () => {
     if (s.male_only > 0) { s.male_only--; res.allocated_male++; return true; }
-    if (s.unisex > 0) { s.unisex--; res.allocated_unisex++; return true; }
+    if (s.anygender > 0) { s.anygender--; res.allocated_anygender++; return true; }
     return false;
   };
 
   const tryAllocFemale = () => {
     if (s.female_only > 0) { s.female_only--; res.allocated_female++; return true; }
-    if (s.unisex > 0) { s.unisex--; res.allocated_unisex++; return true; }
+    if (s.anygender > 0) { s.anygender--; res.allocated_anygender++; return true; }
+    return false;
+  };
+
+  const tryAllocChild = () => {
+    // Children can take any seat type - try in order of preference
+    if (s.anygender > 0) { s.anygender--; res.allocated_children++; return true; }
+    if (s.male_only > 0) { s.male_only--; res.allocated_children++; return true; }
+    if (s.female_only > 0) { s.female_only--; res.allocated_children++; return true; }
     return false;
   };
 
@@ -38,6 +46,7 @@ function allocFromOffer(seats, need, allowSameGenderCouple=false, together=false
     for (let i=0;i<n.couples;i++) { if (!tryAllocCouple()) { ok = false; break; } }
     for (let i=0;i<n.males && ok;i++) { if (!tryAllocMale()) { ok = false; break; } }
     for (let i=0;i<n.females && ok;i++) { if (!tryAllocFemale()) { ok = false; break; } }
+    for (let i=0;i<(n.children||0) && ok;i++) { if (!tryAllocChild()) { ok = false; break; } }
     if (!ok) return { ok: false };
     return { ok: true, res, seatsLeft: s };
   }
@@ -46,14 +55,15 @@ function allocFromOffer(seats, need, allowSameGenderCouple=false, together=false
   while (n.couples > 0 && tryAllocCouple()) n.couples--;
   while (n.males > 0 && tryAllocMale()) n.males--;
   while (n.females > 0 && tryAllocFemale()) n.females--;
-  const covered = (n.couples===0 && n.males===0 && n.females===0);
+  while ((n.children||0) > 0 && tryAllocChild()) n.children--;
+  const covered = (n.couples===0 && n.males===0 && n.females===0 && (n.children||0)===0);
   return { ok: covered, partial: !covered, res, seatsLeft: s, remaining: n };
 }
 
 export async function matchNewOffer(offer, requests) {
   // requests should be sorted by created_at ASC (FIFO), filtered by direction and time window containment
-  let seatsLeft = { male_only: offer.seats_male_only, female_only: offer.seats_female_only, unisex: offer.seats_unisex };
-  const seatsLeftTotal = () => seatsLeft.male_only + seatsLeft.female_only + seatsLeft.unisex;
+  let seatsLeft = { male_only: offer.seats_male_only, female_only: offer.seats_female_only, anygender: offer.seats_anygender };
+  const seatsLeftTotal = () => seatsLeft.male_only + seatsLeft.female_only + seatsLeft.anygender;
   const matches = [];
   
   logger.debug('Matching new offer with requests', {
@@ -61,7 +71,7 @@ export async function matchNewOffer(offer, requests) {
     seatsAvailable: {
       maleOnly: offer.seats_male_only,
       femaleOnly: offer.seats_female_only,
-      unisex: offer.seats_unisex
+      anygender: offer.seats_anygender
     },
     requestCount: requests.length,
     direction: offer.direction,
@@ -74,7 +84,7 @@ export async function matchNewOffer(offer, requests) {
       break;
     }
     
-    const need = { couples: r.couples_count||0, males: r.passengers_male||0, females: r.passengers_female||0 };
+    const need = { couples: r.couples_count||0, males: r.passengers_male||0, females: r.passengers_female||0, children: r.children_count||0 };
     logger.debug('Checking request against offer', {
       offerId: offer.id,
       requestId: r.id,
@@ -115,7 +125,7 @@ export async function matchNewOffer(offer, requests) {
         break; // for together, allocate to a single request only
       }
     } else {
-      const allocatedCount = m.res.allocated_couples * 2 + m.res.allocated_male + m.res.allocated_female + m.res.allocated_unisex;
+      const allocatedCount = m.res.allocated_couples * 2 + m.res.allocated_male + m.res.allocated_female + m.res.allocated_anygender;
       if (allocatedCount > 0) {
         logger.debug('Found partial match for request', { 
           offerId: offer.id, 
@@ -158,8 +168,8 @@ export async function matchNewOffer(offer, requests) {
 
 export async function matchNewRequest(request, offers) {
   // offers should be filtered by direction and overlapping time, sorted by departure_time asc (then created_at)
-  let remaining = { couples: request.couples_count||0, males: request.passengers_male||0, females: request.passengers_female||0 };
-  const remainingTotal = () => remaining.couples * 2 + remaining.males + remaining.females;
+  let remaining = { couples: request.couples_count||0, males: request.passengers_male||0, females: request.passengers_female||0, children: request.children_count||0 };
+  const remainingTotal = () => remaining.couples * 2 + remaining.males + remaining.females + (remaining.children||0);
   const matches = [];
   
   logger.debug('Matching new request with offers', {
@@ -167,7 +177,8 @@ export async function matchNewRequest(request, offers) {
     need: {
       couples: request.couples_count||0,
       males: request.passengers_male||0,
-      females: request.passengers_female||0
+      females: request.passengers_female||0,
+      children: request.children_count||0
     },
     offerCount: offers.length,
     direction: request.direction,
@@ -201,7 +212,7 @@ export async function matchNewRequest(request, offers) {
       break;
     }
     
-    const seats = { male_only: o.seats_male_only, female_only: o.seats_female_only, unisex: o.seats_unisex };
+    const seats = { male_only: o.seats_male_only, female_only: o.seats_female_only, anygender: o.seats_anygender };
     logger.debug('Checking offer against request', {
       requestId: request.id,
       offerId: o.id,
@@ -242,7 +253,7 @@ export async function matchNewRequest(request, offers) {
         break; // fully satisfied by this offer
       }
     } else {
-      const allocatedCount = m.res.allocated_couples * 2 + m.res.allocated_male + m.res.allocated_female + m.res.allocated_unisex;
+      const allocatedCount = m.res.allocated_couples * 2 + m.res.allocated_male + m.res.allocated_female + m.res.allocated_anygender;
       if (allocatedCount > 0) {
         logger.debug('Found partial match for request', {
           requestId: request.id,

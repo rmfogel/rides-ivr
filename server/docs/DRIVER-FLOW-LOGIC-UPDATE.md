@@ -22,7 +22,7 @@
 1. כמה מקומות פנויים יש לך בסך הכל? [0-9] �? total = 4
 2. כמה מתוכם לגברים בלבד? [0-4] �? male = 1
 3. כמה מתוכם לנשים בלבד? [0-3] �? female = 1
-�? חישוב אוטומטי: unisex = total - male - female = 2
+�? חישוב אוטומטי: anygender = total - male - female = 2
 ```
 
 ---
@@ -75,7 +75,7 @@
    💾 שמירה: session.maleOnlySeats = Y
    
    🔀 אם Y === X (כל המקומות לגברים):
-      💾 auto: female = 0, unisex = 0
+      💾 auto: female = 0, anygender = 0
       �?�? דילוג ישירות ל-/driver-confirm
    
    🔀 אם Y < X (נשארו מקומות):
@@ -86,7 +86,7 @@
    �? בדיקה: female �? (total - male)
    �? בדיקה: ספרה חוקית
    💾 שמירה: session.femaleOnlySeats = Z
-   🧮 חישוב אוטומטי: session.unisexSeats = X - Y - Z
+   🧮 חישוב אוטומטי: session.anygenderSeats = X - Y - Z
    �?�? מעבר ל-/driver-confirm
    
 ✔️ /driver-confirm
@@ -121,7 +121,7 @@
 �?? כמה מתוכם לנשים בלבד?
 👨‍✈�? [2]
 
-💾 תוצאה: total=4, male=2, female=2, unisex=0
+💾 תוצאה: total=4, male=2, female=2, anygender=0
 ```
 
 ### דוגמה 3: כל המקומות לגברים (קיצור דרך)
@@ -134,7 +134,7 @@
 
 �? דילוג על שאלת נשים - קפיצה ישירות לאישור
 
-💾 תוצאה: total=3, male=3, female=0, unisex=0
+💾 תוצאה: total=3, male=3, female=0, anygender=0
 ```
 
 ### דוגמה 4: מצב מעורב
@@ -148,7 +148,7 @@
 �?? כמה מתוכם לנשים בלבד?
 👨‍✈�? [1]
 
-💾 תוצאה: total=5, male=1, female=1, unisex=3
+💾 תוצאה: total=5, male=1, female=1, anygender=3
 ```
 
 ---
@@ -170,13 +170,13 @@
 
 ### Route שנמחק:
 ```javascript
-// �? DELETED: /driver-unisex-seats
+// �? DELETED: /driver-anygender-seats
 // הסיבה: אין צורך לשאול - מחושב אוטומטית
 ```
 
 הנהג **לא צריך** להזין את מספר המקומות המעורבים - המערכת מחשבת:
 ```javascript
-unisexSeats = totalSeats - maleOnlySeats - femaleOnlySeats
+anygenderSeats = totalSeats - maleOnlySeats - femaleOnlySeats
 ```
 
 ---
@@ -189,8 +189,8 @@ unisexSeats = totalSeats - maleOnlySeats - femaleOnlySeats
 | | - `/driver-seats` | עודכן להשתמש ב-`driver_total_seats_question` |
 | | + `/driver-total-seats` | route חדש לטיפול בסה"כ |
 | | ~ `/driver-male-seats` | לוגיקה משופרת + קיצור דרך |
-| | ~ `/driver-female-seats` | חישוב אוטומטי של unisex |
-| | - `/driver-unisex-seats` | **נמחק לחלוטין** |
+| | ~ `/driver-female-seats` | חישוב אוטומטי של anygender |
+| | - `/driver-anygender-seats` | **נמחק לחלוטין** |
 | `src/utils/recordings.js` | עודכן | +3 מפתחות חדשים |
 | `public/audio/he/099.mp3` | נוסף | 24.6 KB |
 | `public/audio/he/110.mp3` | נוסף | 16.9 KB |
@@ -222,7 +222,7 @@ unisexSeats = totalSeats - maleOnlySeats - femaleOnlySeats
 ## 🧪 בדיקות נדרשות
 
 ### תרחישים לבדיקה:
-- [ ] נהג עם 1 מקום �? צריך לשאול גברים/נשים, לחשב unisex
+- [ ] נהג עם 1 מקום �? צריך לשאול גברים/נשים, לחשב anygender
 - [ ] נהג עם 4 מקומות, כולם לגברים �? צריך לדלג על שאלת נשים
 - [ ] נהג עם 0 מקומות �? צריך לדחות עם "need_at_least_one_passenger"
 - [ ] נהג מזין 5 כסה"כ, אחרי זה 6 לגברים �? צריך לדחות
@@ -234,8 +234,8 @@ unisexSeats = totalSeats - maleOnlySeats - femaleOnlySeats
 Total: 7
 Male: 2
 Female: 3
-�? Unisex: 2 (אוטומטי)
-�? שמירה: 2 male-only, 3 female-only, 2 unisex
+�? anygender: 2 (אוטומטי)
+�? שמירה: 2 male-only, 3 female-only, 2 anygender
 ```
 
 ---

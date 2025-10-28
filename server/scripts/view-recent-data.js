@@ -29,7 +29,7 @@ async function viewRecentData() {
         console.log(`  Driver: ${driverName} (${offer.driver_phone})`);
         console.log(`  Direction: ${offer.direction}`);
         console.log(`  Departure: ${departureTime}`);
-        console.log(`  Seats: ${offer.seats_male_only} male, ${offer.seats_female_only} female, ${offer.seats_unisex} unisex`);
+        console.log(`  Seats: ${offer.seats_male_only} male, ${offer.seats_female_only} female, ${offer.seats_anygender} anygender`);
         console.log(`  Status: ${offer.status}`);
         console.log(`  Created: ${DateTime.fromJSDate(offer.created_at).toFormat('yyyy-MM-dd HH:mm:ss')}`);
       }

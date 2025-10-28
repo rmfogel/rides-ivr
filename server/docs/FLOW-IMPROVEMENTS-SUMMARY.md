@@ -157,12 +157,12 @@
 
 ---
 
-#### מושבים unisex לנהג (Unisex Seats)
+#### מושבים anygender לנהג (anygender Seats)
 - אימות קלט
 - בדיקה שיש לפחות מושב אחד בסך הכל
 
 **קבצים מושפעים:**
-- `/voice/driver-unisex-seats` (שורה ~1197)
+- `/voice/driver-anygender-seats` (שורה ~1197)
 
 ---
 

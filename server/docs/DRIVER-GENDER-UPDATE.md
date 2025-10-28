@@ -11,7 +11,7 @@
 המערכת תומכת ב-3 סוגי מושבים:
 - `maleOnlySeats` - מקומות לגברים בלבד
 - `femaleOnlySeats` - מקומות לנשים בלבד  
-- `unisexSeats` - מקומות מעורבים
+- `anygenderSeats` - מקומות מעורבים
 
 ## מה שונה
 
@@ -79,7 +79,7 @@ driver_female_seats_question: '098', // כמה מקומות לנשים יש לך
    ↓ [0-9]
 6. מקומות לנשים: /driver-female-seats
    ↓ [0-9]
-7. מקומות מעורבים: /driver-unisex-seats
+7. מקומות מעורבים: /driver-anygender-seats
    ↓ [0-9]
 8. אישור: /driver-confirm
    ↓ [1=אישור/2=התחלה מחדש]

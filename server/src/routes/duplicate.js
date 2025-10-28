@@ -231,7 +231,7 @@ duplicateRouter.post('/confirm', async (req, res) => {
           departure_time: depUtc,
           seats_male_only: lastRide.seats_male_only,
           seats_female_only: lastRide.seats_female_only,
-          seats_unisex: lastRide.seats_unisex,
+          seats_anygender: lastRide.seats_anygender,
         });
         
         // Get matches and provide immediate feedback

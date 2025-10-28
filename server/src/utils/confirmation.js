@@ -120,11 +120,11 @@ export function playPassengerDetails(twimlNode, passengers, lang = 'he') {
  * @param {number} seats.total - Total seats
  * @param {number} seats.male - Male-only seats
  * @param {number} seats.female - Female-only seats
- * @param {number} seats.unisex - Unisex seats
+ * @param {number} seats.anygender - anygender seats
  * @param {string} lang - Language code (default: 'he')
  */
 export function playSeatDetails(twimlNode, seats, lang = 'he') {
-  const { total = 0, male = 0, female = 0, unisex = 0 } = seats;
+  const { total = 0, male = 0, female = 0, anygender = 0 } = seats;
   
   // Play total seats
   playDigits(twimlNode, total.toString(), lang);
@@ -142,10 +142,10 @@ export function playSeatDetails(twimlNode, seats, lang = 'he') {
     playPrompt(twimlNode, 'seats_female_only', lang);
   }
   
-  // Play unisex seats
-  if (unisex > 0) {
-    playDigits(twimlNode, unisex.toString(), lang);
-    playPrompt(twimlNode, 'seats_unisex', lang);
+  // Play anygender seats
+  if (anygender > 0) {
+    playDigits(twimlNode, anygender.toString(), lang);
+    playPrompt(twimlNode, 'seats_anygender', lang);
   }
 }
 

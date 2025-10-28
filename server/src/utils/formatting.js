@@ -18,7 +18,7 @@ export function formatRideDetails(ride, isOffer) {
     
     let seatsInfo;
     if (isOffer) {
-      seatsInfo = `with ${ride.seats_male_only || 0} male-only, ${ride.seats_female_only || 0} female-only, and ${ride.seats_unisex || 0} unisex seats`;
+      seatsInfo = `with ${ride.seats_male_only || 0} male-only, ${ride.seats_female_only || 0} female-only, and ${ride.seats_anygender || 0} anygender seats`;
     } else {
       seatsInfo = `for ${ride.passengers_total} passengers (${ride.couples_count || 0} couples, ${ride.passengers_male || 0} men, ${ride.passengers_female || 0} women)`;
     }
