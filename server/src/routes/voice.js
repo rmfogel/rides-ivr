@@ -1040,12 +1040,18 @@ voiceRouter.post('/rider-submit', async (req, res) => {
         // Prefer user object data if available
         if (matchedOffer.user) {
           driverName = matchedOffer.user.name;
-          driverPhone = matchedOffer.user.phone || matchedOffer.driver_phone;
+          // Always use the user's registered phone number when available
+          if (matchedOffer.user.phone) {
+            driverPhone = matchedOffer.user.phone;
+          }
         } else {
           // Fallback to separate query if user not populated
           const driver = await getUserByPhone(driverPhone);
           if (driver && driver.name) {
             driverName = driver.name;
+          }
+          if (driver && driver.phone) {
+            driverPhone = driver.phone;
           }
         }
         
@@ -1695,12 +1701,18 @@ voiceRouter.post('/driver-submit', async (req, res) => {
         // Prefer user object data if available
         if (matchedRequest.user) {
           riderName = matchedRequest.user.name;
-          riderPhone = matchedRequest.user.phone || matchedRequest.rider_phone;
+          // Always use the user's registered phone number when available
+          if (matchedRequest.user.phone) {
+            riderPhone = matchedRequest.user.phone;
+          }
         } else {
           // Fallback to separate query if user not populated
           const rider = await getUserByPhone(riderPhone);
           if (rider && rider.name) {
             riderName = rider.name;
+          }
+          if (rider && rider.phone) {
+            riderPhone = rider.phone;
           }
         }
         
@@ -1768,15 +1780,27 @@ voiceRouter.post('/rider-confirm-match', async (req, res) => {
       // Rider accepted the match
       await updateMatchStatus(matchId, 'accepted');
       
-      // Get offer details again to confirm
-      const offer = await getOfferById(offerId);
+      // Get offer details with user information
+      const offer = await getOfferWithUser(offerId);
       const departureTime = DateTime.fromJSDate(offer.departure_time).setZone(TZ);
       const timeStr = departureTime.toFormat('HH:mm');
+      
+      // Get the driver's phone number from user object if available
+      let driverPhone = offer.driver_phone;
+      if (offer.user && offer.user.phone) {
+        driverPhone = offer.user.phone;
+      } else if (!offer.user) {
+        // Fallback to user lookup if not populated
+        const driver = await getUserByPhone(offer.driver_phone);
+        if (driver && driver.phone) {
+          driverPhone = driver.phone;
+        }
+      }
       
       playPrompt(twiml, 'rider_accepted');
       playPrompt(twiml, 'driver_phone_number_is');
       {
-        const s = String(offer.driver_phone || '');
+        const s = String(driverPhone || '');
         for (const ch of s) {
           if (ch === '+') playPrompt(twiml, 'plus');
           else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
@@ -1792,9 +1816,20 @@ voiceRouter.post('/rider-confirm-match', async (req, res) => {
       twiml.hangup();
     } else if (Digits === '3') {
       // Rider wants to hear the driver's phone number
-      const offer = await getOfferById(offerId);
+      const offer = await getOfferWithUser(offerId);
       if (offer) {
-        twiml.redirect(`/voice/ringback-hear-phone?phone=${encodeURIComponent(offer.driver_phone)}&type=driver`);
+        // Get the driver's phone number from user object if available
+        let driverPhone = offer.driver_phone;
+        if (offer.user && offer.user.phone) {
+          driverPhone = offer.user.phone;
+        } else if (!offer.user) {
+          // Fallback to user lookup if not populated
+          const driver = await getUserByPhone(offer.driver_phone);
+          if (driver && driver.phone) {
+            driverPhone = driver.phone;
+          }
+        }
+        twiml.redirect(`/voice/ringback-hear-phone?phone=${encodeURIComponent(driverPhone)}&type=driver`);
       } else {
   playPrompt(twiml, 'info_not_available');
         twiml.hangup();
@@ -1825,8 +1860,8 @@ voiceRouter.post('/driver-confirm-match', async (req, res) => {
       // Driver accepted the match
       await updateMatchStatus(matchId, 'accepted');
       
-      // Get request details again to confirm
-      const request = await getRequestById(requestId);
+      // Get request details with user information
+      const request = await getRequestWithUser(requestId);
       
       // Format time information
       let timeInfo = "";
@@ -1839,10 +1874,22 @@ voiceRouter.post('/driver-confirm-match', async (req, res) => {
         timeInfo = ` between ${earliestTime.toFormat('HH:mm')} and ${latestTime.toFormat('HH:mm')}`;
       }
       
+      // Get the rider's phone number from user object if available
+      let riderPhone = request.rider_phone;
+      if (request.user && request.user.phone) {
+        riderPhone = request.user.phone;
+      } else if (!request.user) {
+        // Fallback to user lookup if not populated
+        const rider = await getUserByPhone(request.rider_phone);
+        if (rider && rider.phone) {
+          riderPhone = rider.phone;
+        }
+      }
+      
       playPrompt(twiml, 'driver_accepted');
       playPrompt(twiml, 'passenger_phone_number_is');
       {
-        const s = String(request.rider_phone || '');
+        const s = String(riderPhone || '');
         for (const ch of s) {
           if (ch === '+') playPrompt(twiml, 'plus');
           else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
@@ -1858,9 +1905,20 @@ voiceRouter.post('/driver-confirm-match', async (req, res) => {
       twiml.hangup();
     } else if (Digits === '3') {
       // Driver wants to hear the passenger's phone number
-      const request = await getRequestById(requestId);
+      const request = await getRequestWithUser(requestId);
       if (request) {
-        twiml.redirect(`/voice/ringback-hear-phone?phone=${encodeURIComponent(request.rider_phone)}&type=passenger`);
+        // Get the rider's phone number from user object if available
+        let riderPhone = request.rider_phone;
+        if (request.user && request.user.phone) {
+          riderPhone = request.user.phone;
+        } else if (!request.user) {
+          // Fallback to user lookup if not populated
+          const rider = await getUserByPhone(request.rider_phone);
+          if (rider && rider.phone) {
+            riderPhone = rider.phone;
+          }
+        }
+        twiml.redirect(`/voice/ringback-hear-phone?phone=${encodeURIComponent(riderPhone)}&type=passenger`);
       } else {
   playPrompt(twiml, 'info_not_available');
         twiml.hangup();
@@ -1992,12 +2050,18 @@ voiceRouter.post('/ringback-start', async (req, res) => {
           // Prefer user object data if available
           if (request.user) {
             riderName = request.user.name;
-            riderPhone = request.user.phone || request.rider_phone;
+            // Always use the user's registered phone number when available
+            if (request.user.phone) {
+              riderPhone = request.user.phone;
+            }
           } else {
             // Fallback to separate query if user not populated
             const rider = await getUserByPhone(riderPhone);
             if (rider && rider.name) {
               riderName = rider.name;
+            }
+            if (rider && rider.phone) {
+              riderPhone = rider.phone;
             }
           }
           
