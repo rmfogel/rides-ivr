@@ -14,7 +14,7 @@
 
 מושגים
 - כיוון: FROM = יוצא מהיישוב, TO = לכיוון היישוב.
-- מושבים: male_only, female_only, unisex.
+- מושבים: male_only, female_only, anygender.
 - בקשה: passengers_total, couples_count, single_males, single_females, together.
 - צינתוק: שיחה יוצאת קצרה לנוסע (רינג קצר, ניתוק), כדי לסמן שנמצאה התאמה.
 
@@ -101,11 +101,11 @@
 - together=false: מותר פיצול בין כל מספר נהגים. יעד משני: למזער מספר נהגים, אך לא על חשבון FIFO של הבקשות.
 
 כללי הקצאת מושבים (לפי רכב/הצעה אחת)
-- יחיד גבר: קודם male_only, אחרת unisex.
-- יחידה אישה: קודם female_only, אחרת unisex.
+- יחיד גבר: קודם male_only, אחרת anygender.
+- יחידה אישה: קודם female_only, אחרת anygender.
 - זוג: סדר נסיון:
   1) מושב male_only + מושב female_only (אם זמינים)
-  2) שני מושבי unisex
+  2) שני מושבי anygender
   3) שני מושבים מאותו מגדר (male_only*2 או female_only*2) – רק אם מדיניות הקהילה מאפשרת. ברירת מחדל: לא.
 - ניטרליות: אין קדימות לזוגות; ההקצאה יכולה להיות בסבב מאוזן בין יחידות (זוג/גבר/אישה) כדי למנוע נעילת גמישות.
 
@@ -157,9 +157,9 @@
 
 ## סכימת נתונים מוצעת (PostgreSQL)
 - Users(id, phone unique, name, is_allowed, declared_gender ENUM('male','female') NULL, created_at, updated_at)
-- RideOffers(id, driver_phone FK Users.phone, direction ENUM('FROM','TO'), departure_time timestamptz, seats_male_only int, seats_female_only int, seats_unisex int, status ENUM('active','expired','cancelled','filled'), created_at, expires_at)
+- RideOffers(id, driver_phone FK Users.phone, direction ENUM('FROM','TO'), departure_time timestamptz, seats_male_only int, seats_female_only int, seats_anygender int, status ENUM('active','expired','cancelled','filled'), created_at, expires_at)
 - RideRequests(id, rider_phone FK Users.phone, direction ENUM('FROM','TO'), request_date date (נגזר), earliest_time timestamptz, latest_time timestamptz, passengers_total int, couples_count int, passengers_male int, passengers_female int, together boolean, status ENUM('open','partial','matched','expired','cancelled'), created_at, expires_at)
-- Matches(id, offer_id FK, request_id FK, allocated_couples int, allocated_male int, allocated_female int, allocated_unisex int, status ENUM('pending','notified','connected','confirmed','declined','expired'), notified_via ENUM('ringback'), hold_expires_at timestamptz, created_at, updated_at)
+- Matches(id, offer_id FK, request_id FK, allocated_couples int, allocated_male int, allocated_female int, allocated_anygender int, status ENUM('pending','notified','connected','confirmed','declined','expired'), notified_via ENUM('ringback'), hold_expires_at timestamptz, created_at, updated_at)
 - אינדקסים: לפי סטטוס+זמן לשאילתות מהירות.
 
 ## ממשקי שרת ווובהוקים (Node/Express לדוגמה)

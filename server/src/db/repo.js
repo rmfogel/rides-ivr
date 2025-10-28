@@ -52,6 +52,16 @@ export async function upsertUser(user) {
 export async function addOffer(offer) {
   const { offers } = await collections();
   const doc = { ...offer, status: 'active', created_at: new Date() };
+  
+  // Convert user_id to ObjectId if provided as string
+  if (doc.user_id && typeof doc.user_id === 'string') {
+    try {
+      doc.user_id = oid(doc.user_id);
+    } catch (err) {
+      logger.warn('Invalid user_id format in offer', { user_id: doc.user_id });
+    }
+  }
+  
   const { insertedId } = await offers.insertOne(doc);
   doc.id = insertedId.toString();
   return normalize(doc);
@@ -60,6 +70,16 @@ export async function addOffer(offer) {
 export async function addRequest(request) {
   const { requests } = await collections();
   const doc = { ...request, status: 'open', created_at: new Date() };
+  
+  // Convert user_id to ObjectId if provided as string
+  if (doc.user_id && typeof doc.user_id === 'string') {
+    try {
+      doc.user_id = oid(doc.user_id);
+    } catch (err) {
+      logger.warn('Invalid user_id format in request', { user_id: doc.user_id });
+    }
+  }
+  
   const { insertedId } = await requests.insertOne(doc);
   doc.id = insertedId.toString();
   return normalize(doc);
@@ -127,6 +147,76 @@ export async function getRequestById(id) {
   const { requests } = await collections();
   const doc = await requests.findOne({ _id: oid(id) });
   return normalize(doc);
+}
+
+/**
+ * Get an offer by ID with populated user information
+ * @param {string} id - Offer ID
+ * @returns {Promise<Object|null>} Offer with user property containing full user details
+ */
+export async function getOfferWithUser(id) {
+  const { offers, users } = await collections();
+  const pipeline = [
+    { $match: { _id: oid(id) } },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'user_id',
+        foreignField: '_id',
+        as: 'user'
+      }
+    },
+    {
+      $unwind: {
+        path: '$user',
+        preserveNullAndEmptyArrays: true
+      }
+    }
+  ];
+  
+  const results = await offers.aggregate(pipeline).toArray();
+  if (results.length === 0) return null;
+  
+  const doc = normalize(results[0]);
+  if (doc.user) {
+    doc.user = normalize(doc.user);
+  }
+  return doc;
+}
+
+/**
+ * Get a request by ID with populated user information
+ * @param {string} id - Request ID
+ * @returns {Promise<Object|null>} Request with user property containing full user details
+ */
+export async function getRequestWithUser(id) {
+  const { requests, users } = await collections();
+  const pipeline = [
+    { $match: { _id: oid(id) } },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'user_id',
+        foreignField: '_id',
+        as: 'user'
+      }
+    },
+    {
+      $unwind: {
+        path: '$user',
+        preserveNullAndEmptyArrays: true
+      }
+    }
+  ];
+  
+  const results = await requests.aggregate(pipeline).toArray();
+  if (results.length === 0) return null;
+  
+  const doc = normalize(results[0]);
+  if (doc.user) {
+    doc.user = normalize(doc.user);
+  }
+  return doc;
 }
 
 export async function getUserByPhone(phone) {
@@ -263,6 +353,10 @@ function normalize(doc) {
   if (!doc) return null;
   if (doc._id) {
     doc.id = doc._id.toString();
+  }
+  // Convert ObjectId fields to strings for easier consumption
+  if (doc.user_id && typeof doc.user_id === 'object') {
+    doc.user_id = doc.user_id.toString();
   }
   return doc;
 }
