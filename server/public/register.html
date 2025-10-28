@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>הרשמה למערכת הסעות</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #f0ebf8;
+            color: #202124;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+        }
+
+        .header {
+            background-color: #673ab7;
+            padding: 24px 24px 12px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .form-title {
+            color: white;
+            font-size: 32px;
+            font-weight: 400;
+            margin-bottom: 8px;
+            letter-spacing: 0;
+        }
+
+        .form-description {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .form-content {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 400;
+            color: #202124;
+            margin-bottom: 8px;
+        }
+
+        .required {
+            color: #d93025;
+            margin-right: 4px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background-color: white;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            border-color: #673ab7;
+            box-shadow: 0 1px 1px 0 rgba(103, 58, 183, 0.1), 0 1px 3px 1px rgba(103, 58, 183, 0.1);
+        }
+
+        .form-input::placeholder {
+            color: #5f6368;
+            opacity: 1;
+        }
+
+        .form-select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left 12px center;
+            background-size: 20px;
+            padding-left: 40px;
+        }
+
+        .form-helper {
+            font-size: 12px;
+            color: #5f6368;
+            margin-top: 4px;
+        }
+
+        .error-message {
+            color: #d93025;
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .form-input.error,
+        .form-select.error {
+            border-color: #d93025;
+        }
+
+        .form-input.error:focus,
+        .form-select.error:focus {
+            border-color: #d93025;
+            box-shadow: 0 1px 1px 0 rgba(217, 48, 37, 0.1), 0 1px 3px 1px rgba(217, 48, 37, 0.1);
+        }
+
+        .submit-section {
+            padding: 24px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #dadce0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .submit-button {
+            background-color: #673ab7;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            letter-spacing: 0.25px;
+        }
+
+        .submit-button:hover {
+            background-color: #5e35b1;
+            box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+        }
+
+        .submit-button:active {
+            background-color: #512da8;
+        }
+
+        .submit-button:disabled {
+            background-color: #dadce0;
+            color: #5f6368;
+            cursor: not-allowed;
+        }
+
+        .clear-button {
+            background: none;
+            border: none;
+            color: #673ab7;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .clear-button:hover {
+            background-color: rgba(103, 58, 183, 0.08);
+        }
+
+        .success-message {
+            background-color: #e8f5e9;
+            color: #1e7e34;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 24px;
+            display: none;
+            border-right: 4px solid #4caf50;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 0;
+            }
+
+            .container {
+                border-radius: 0;
+            }
+
+            .header {
+                border-radius: 0;
+            }
+
+            .form-content {
+                padding: 16px;
+            }
+
+            .submit-section {
+                padding: 16px;
+                flex-direction: column-reverse;
+                gap: 12px;
+                align-items: stretch;
+            }
+
+            .submit-button,
+            .clear-button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="form-title">הרשמה למערכת הסעות</h1>
+            <p class="form-description">אנא מלא את הפרטים הבאים כדי להירשם למערכת</p>
+        </div>
+
+        <div class="form-content">
+            <div class="success-message" id="successMessage">
+                ההרשמה הושלמה בהצלחה! נציג יצור איתך קשר בקרוב.
+            </div>
+
+            <form id="registrationForm" novalidate>
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="required">*</span>
+                        שם פרטי (באנגלית)
+                    </label>
+                    <input 
+                        type="text" 
+                        class="form-input" 
+                        id="firstName" 
+                        name="firstName" 
+                        placeholder="First Name"
+                        required
+                        pattern="[A-Za-z\s-']+"
+                        dir="ltr"
+                        style="text-align: left;"
+                    >
+                    <div class="form-helper">שם פרטי באנגלית בלבד</div>
+                    <div class="error-message" id="firstNameError">נא להזין שם פרטי באנגלית</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="required">*</span>
+                        שם משפחה (באנגלית)
+                    </label>
+                    <input 
+                        type="text" 
+                        class="form-input" 
+                        id="lastName" 
+                        name="lastName" 
+                        placeholder="Last Name"
+                        required
+                        pattern="[A-Za-z\s-']+"
+                        dir="ltr"
+                        style="text-align: left;"
+                    >
+                    <div class="form-helper">שם משפחה באנגלית בלבד</div>
+                    <div class="error-message" id="lastNameError">נא להזין שם משפחה באנגלית</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="required">*</span>
+                        מספר טלפון
+                    </label>
+                    <input 
+                        type="tel" 
+                        class="form-input" 
+                        id="phone" 
+                        name="phone" 
+                        placeholder="050-1234567"
+                        required
+                    >
+                    <div class="form-helper">פורמט: 050-1234567 או 0501234567</div>
+                    <div class="error-message" id="phoneError">נא להזין מספר טלפון תקין</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="required">*</span>
+                        כתובת דוא"ל
+                    </label>
+                    <input 
+                        type="email" 
+                        class="form-input" 
+                        id="email" 
+                        name="email" 
+                        placeholder="example@email.com"
+                        required
+                    >
+                    <div class="error-message" id="emailError">נא להזין כתובת דוא"ל תקינה</div>
+                </div>
+            </form>
+        </div>
+
+        <div class="submit-section">
+            <button type="button" class="clear-button" id="clearButton">נקה טופס</button>
+            <button type="submit" class="submit-button" id="submitButton">שלח</button>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registrationForm');
+        const submitButton = document.getElementById('submitButton');
+        const clearButton = document.getElementById('clearButton');
+        const successMessage = document.getElementById('successMessage');
+
+        // Phone validation
+        function validatePhone(phone) {
+            const phoneRegex = /^0\d{1,2}-?\d{7}$/;
+            return phoneRegex.test(phone.replace(/\s/g, ''));
+        }
+
+        // Email validation
+        function validateEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        // English name validation
+        function validateEnglishName(name) {
+            const englishNameRegex = /^[A-Za-z\s'-]+$/;
+            return englishNameRegex.test(name);
+        }
+
+        // Clear error
+        function clearError(fieldId) {
+            const field = document.getElementById(fieldId);
+            const errorElement = document.getElementById(fieldId + 'Error');
+            field.classList.remove('error');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+        }
+
+        // Show error
+        function showError(fieldId, message) {
+            const field = document.getElementById(fieldId);
+            const errorElement = document.getElementById(fieldId + 'Error');
+            field.classList.add('error');
+            if (errorElement) {
+                if (message) errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+        }
+
+        // Add input listeners to clear errors
+        ['firstName', 'lastName', 'phone', 'email'].forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            field.addEventListener('input', () => clearError(fieldId));
+            field.addEventListener('focus', () => clearError(fieldId));
+        });
+
+        // Form validation
+        function validateForm() {
+            let isValid = true;
+
+            // First name
+            const firstName = document.getElementById('firstName').value.trim();
+            if (!firstName) {
+                showError('firstName', 'נא להזין שם פרטי');
+                isValid = false;
+            } else if (!validateEnglishName(firstName)) {
+                showError('firstName', 'שם פרטי חייב להיות באנגלית בלבד');
+                isValid = false;
+            }
+
+            // Last name
+            const lastName = document.getElementById('lastName').value.trim();
+            if (!lastName) {
+                showError('lastName', 'נא להזין שם משפחה');
+                isValid = false;
+            } else if (!validateEnglishName(lastName)) {
+                showError('lastName', 'שם משפחה חייב להיות באנגלית בלבד');
+                isValid = false;
+            }
+
+            // Phone
+            const phone = document.getElementById('phone').value.trim();
+            if (!phone || !validatePhone(phone)) {
+                showError('phone', 'נא להזין מספר טלפון תקין');
+                isValid = false;
+            }
+
+            // Email
+            const email = document.getElementById('email').value.trim();
+            if (!email) {
+                showError('email', 'נא להזין כתובת דוא"ל');
+                isValid = false;
+            } else if (!validateEmail(email)) {
+                showError('email', 'נא להזין כתובת דוא"ל תקינה');
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        // Submit handler
+        submitButton.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            if (!validateForm()) {
+                return;
+            }
+
+            // Prepare form data
+            const formData = {
+                firstName: document.getElementById('firstName').value.trim(),
+                lastName: document.getElementById('lastName').value.trim(),
+                fullName: document.getElementById('firstName').value.trim() + ' ' + document.getElementById('lastName').value.trim(),
+                phone: document.getElementById('phone').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                timestamp: new Date().toISOString()
+            };
+
+            // Disable button during submission
+            submitButton.disabled = true;
+            submitButton.textContent = 'שולח...';
+
+            try {
+                // Send to backend
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    // Show success message
+                    successMessage.style.display = 'block';
+                    form.reset();
+                    
+                    // Scroll to success message
+                    successMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Hide success message after 5 seconds
+                    setTimeout(() => {
+                        successMessage.style.display = 'none';
+                    }, 5000);
+                } else {
+                    alert('אירעה שגיאה בשליחת הטופס. אנא נסה שוב.');
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                alert('אירעה שגיאה בשליחת הטופס. אנא נסה שוב.');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'שלח';
+            }
+        });
+
+        // Clear form handler
+        clearButton.addEventListener('click', () => {
+            if (confirm('האם אתה בטוח שברצונך לנקות את הטופס?')) {
+                form.reset();
+                successMessage.style.display = 'none';
+                
+                // Clear all errors
+                ['firstName', 'lastName', 'phone', 'email'].forEach(clearError);
+            }
+        });
+    </script>
+</body>
+</html>
