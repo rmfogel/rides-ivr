@@ -41,6 +41,38 @@ function normalizeIsraeliPhone(phone) {
   return cleaned;
 }
 
+/**
+ * Play user's full name using English TTS (works better for Hebrew names)
+ * @param {object} twimlNode - The TwiML node to add the name playback to
+ * @param {object} user - User object with fullName or name property
+ * @param {string} role - 'driver' or 'rider' for logging purposes
+ */
+function playFullName(twimlNode, user, role = 'user') {
+  if (!user) {
+    logger.debug(`No user object provided for ${role}, skipping name playback`);
+    return;
+  }
+  
+  const fullName = user.fullName || user.name;
+  
+  if (!fullName || fullName.trim() === '') {
+    logger.debug(`No name found for ${role}, skipping name playback`, { userId: user.id });
+    return;
+  }
+  
+  try {
+    // Use Polly Joanna (English female voice) - works better for reading Hebrew names
+    twimlNode.say({ 
+      voice: 'Polly.Joanna',
+      language: 'en-US'
+    }, fullName);
+    
+    logger.debug(`Playing full name for ${role}`, { name: fullName, userId: user.id });
+  } catch (error) {
+    logger.error(`Error playing name for ${role}`, { error: error.message, name: fullName });
+  }
+}
+
 // Ensure TwiML is always served with UTF-8 charset so Hebrew characters are valid
 voiceRouter.use((req, res, next) => {
   const originalSend = res.send.bind(res);
@@ -1086,9 +1118,9 @@ voiceRouter.post('/rider-submit', async (req, res) => {
         // Tell the rider about the match
         playPrompt(twiml, 'great_news_found_ride');
         
-        // Play driver's name if available (in English)
-        if (driverName) {
-          twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, driverName);
+        // Play driver's full name in Hebrew if available
+        if (matchedOffer.user) {
+          playFullName(twiml, matchedOffer.user, 'driver');
         }
         
         // Read out the phone number digit by digit
@@ -1754,9 +1786,9 @@ voiceRouter.post('/driver-submit', async (req, res) => {
         // Tell the driver about the match
         playPrompt(twiml, 'great_news_found_ride');
         
-        // Play rider's name if available (in English)
-        if (riderName) {
-          twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, riderName);
+        // Play rider's full name in Hebrew if available
+        if (matchedRequest.user) {
+          playFullName(twiml, matchedRequest.user, 'rider');
         }
         
         // Read out the phone number digit by digit
@@ -1822,14 +1854,15 @@ voiceRouter.post('/rider-confirm-match', async (req, res) => {
       }
       
       playPrompt(twiml, 'rider_accepted');
-      playPrompt(twiml, 'driver_phone_number_is');
-      {
-        const s = String(driverPhone || '');
-        for (const ch of s) {
-          if (ch === '+') playPrompt(twiml, 'plus');
-          else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
-        }
+      
+      // Play driver's full name in Hebrew if available
+      if (offer.user) {
+        playFullName(twiml, offer.user, 'driver');
       }
+      
+      playPrompt(twiml, 'driver_phone_number_is');
+      playDigits(twiml, driverPhone);
+      
       playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (Digits === '2') {
@@ -1911,14 +1944,15 @@ voiceRouter.post('/driver-confirm-match', async (req, res) => {
       }
       
       playPrompt(twiml, 'driver_accepted');
-      playPrompt(twiml, 'passenger_phone_number_is');
-      {
-        const s = String(riderPhone || '');
-        for (const ch of s) {
-          if (ch === '+') playPrompt(twiml, 'plus');
-          else if (/\d/.test(ch)) playPrompt(twiml, `digit_${ch}`);
-        }
+      
+      // Play rider's full name in Hebrew if available
+      if (request.user) {
+        playFullName(twiml, request.user, 'rider');
       }
+      
+      playPrompt(twiml, 'passenger_phone_number_is');
+      playDigits(twiml, riderPhone);
+      
       playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (Digits === '2') {
@@ -2035,9 +2069,9 @@ voiceRouter.post('/ringback-start', async (req, res) => {
           // Tell the rider about the match
           playPrompt(twiml, 'great_news_found_ride');
           
-          // Play driver's name if available (in English)
-          if (driverName) {
-            twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, driverName);
+          // Play driver's full name in Hebrew if available
+          if (offer.user) {
+            playFullName(twiml, offer.user, 'driver');
           }
           
           // Offer options
@@ -2104,9 +2138,9 @@ voiceRouter.post('/ringback-start', async (req, res) => {
           // Tell the driver about the match
           playPrompt(twiml, 'great_news_found_ride');
           
-          // Play rider's name if available (in English)
-          if (riderName) {
-            twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, riderName);
+          // Play rider's full name in Hebrew if available
+          if (request.user) {
+            playFullName(twiml, request.user, 'rider');
           }
           
           // Offer options
