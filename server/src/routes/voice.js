@@ -23,6 +23,24 @@ import { DEFAULT_LANGUAGE } from '../config/language.js';
 
 export const voiceRouter = Router();
 
+/**
+ * Normalize phone number for Israeli system
+ * - Removes all non-digit and non-+ characters
+ * - Converts +972 to 0 (Israeli format)
+ * - Keeps other international formats as-is
+ */
+function normalizeIsraeliPhone(phone) {
+  if (!phone) return '';
+  // Remove all non-digit and non-+ characters
+  let cleaned = phone.replace(/[^+\d]/g, '');
+  // Convert +972 to 0 for Israeli numbers
+  if (cleaned.startsWith('+972')) {
+    cleaned = '0' + cleaned.substring(4);
+  }
+  logger.debug('Normalized phone number', { original: phone, cleaned, cleanedLength: cleaned.length });
+  return cleaned;
+}
+
 // Ensure TwiML is always served with UTF-8 charset so Hebrew characters are valid
 voiceRouter.use((req, res, next) => {
   const originalSend = res.send.bind(res);
@@ -113,7 +131,7 @@ voiceRouter.post('/rider', (req, res) => {
 // Start ride request flow
 voiceRouter.post('/rider-new', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const from = (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
+  const from = normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   
   // Store phone in session
   req.session = req.session || {};
@@ -912,7 +930,7 @@ voiceRouter.post('/rider-submit', async (req, res) => {
   
   if (Digits === '1') {
     try {
-      const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
+      const from = req.session.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
       
       logger.info('Rider submit - phone number', { from, fromLength: from?.length, sessionPhone: req.session.phone });
       
@@ -1121,7 +1139,7 @@ voiceRouter.post('/driver', (req, res) => {
 // Start ride offer flow
 voiceRouter.post('/driver-new', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const from = (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
+  const from = normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   
   // Store phone in session
   req.session = req.session || {};
@@ -1620,7 +1638,7 @@ voiceRouter.post('/driver-submit', async (req, res) => {
   
   if (Digits === '1') {
     try {
-      const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
+      const from = req.session.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
       
       logger.info('Driver submit - phone number', { from, fromLength: from?.length, sessionPhone: req.session.phone });
       
