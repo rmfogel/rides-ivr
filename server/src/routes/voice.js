@@ -914,6 +914,8 @@ voiceRouter.post('/rider-submit', async (req, res) => {
     try {
       const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
       
+      logger.info('Rider submit - phone number', { from, fromLength: from?.length, sessionPhone: req.session.phone });
+      
       // Validate required params
       if (!date || !direction || !earliest || !latest) {
         logger.error('Missing required parameters in rider-submit', {
@@ -1072,6 +1074,7 @@ voiceRouter.post('/rider-submit', async (req, res) => {
         }
         
         // Read out the phone number digit by digit
+        logger.info('Playing driver phone number', { driverPhone, driverPhoneLength: driverPhone?.length });
         playPrompt(twiml, 'driver_phone_number_is');
         playDigits(twiml, driverPhone);
         
@@ -1619,6 +1622,8 @@ voiceRouter.post('/driver-submit', async (req, res) => {
     try {
       const from = req.session.phone || (req.body.Caller || req.body.From || '').replace(/[^+\\d]/g, '');
       
+      logger.info('Driver submit - phone number', { from, fromLength: from?.length, sessionPhone: req.session.phone });
+      
       // Validate required params
       if (!date || !direction || !time) {
         logger.error('Missing required parameters in driver-submit', {
@@ -1737,6 +1742,7 @@ voiceRouter.post('/driver-submit', async (req, res) => {
         }
         
         // Read out the phone number digit by digit
+        logger.info('Playing rider phone number', { riderPhone, riderPhoneLength: riderPhone?.length });
         playPrompt(twiml, 'passenger_phone_number_is');
         playDigits(twiml, riderPhone);
         
@@ -2117,6 +2123,7 @@ voiceRouter.post('/ringback-hear-phone', async (req, res) => {
   const { phone, type } = req.query;
   
   try {
+    logger.info('Ringback hear phone', { phone, phoneLength: phone?.length, type });
     playPrompt(twiml, type === 'driver' ? 'driver_phone_number_is' : 'passenger_phone_number_is');
     playDigits(twiml, phone);
     twiml.pause({ length: 1 });

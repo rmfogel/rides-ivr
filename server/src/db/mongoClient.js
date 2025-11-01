@@ -147,17 +147,21 @@ export async function collections() {
     offers: database.collection('ride_offers'),
     requests: database.collection('ride_requests'),
     matches: database.collection('matches'),
+    registrations: database.collection('registrations'),
   };
   return cols;
 }
 
 export async function ensureIndexes() {
-  const { users, offers, requests, matches } = await collections();
+  const { users, offers, requests, matches, registrations } = await collections();
   await Promise.all([
     users.createIndex({ phone: 1 }, { unique: true }),
     offers.createIndex({ status: 1, departure_time: 1 }),
     requests.createIndex({ status: 1, earliest_time: 1, latest_time: 1 }),
     matches.createIndex({ request_id: 1 }),
     matches.createIndex({ status: 1, created_at: 1 }),
+    registrations.createIndex({ phone: 1 }, { unique: true }),
+    registrations.createIndex({ status: 1 }),
+    registrations.createIndex({ createdAt: 1 }),
   ]);
 }

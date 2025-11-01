@@ -181,6 +181,16 @@ export async function getOfferWithUser(id) {
   if (doc.user) {
     doc.user = normalize(doc.user);
   }
+  
+  // Log phone numbers for debugging
+  console.log('getOfferWithUser result:', {
+    offerId: id,
+    driver_phone: doc.driver_phone,
+    driver_phone_length: doc.driver_phone?.length,
+    user_phone: doc.user?.phone,
+    user_phone_length: doc.user?.phone?.length
+  });
+  
   return doc;
 }
 
@@ -216,6 +226,16 @@ export async function getRequestWithUser(id) {
   if (doc.user) {
     doc.user = normalize(doc.user);
   }
+  
+  // Log phone numbers for debugging
+  console.log('getRequestWithUser result:', {
+    requestId: id,
+    rider_phone: doc.rider_phone,
+    rider_phone_length: doc.rider_phone?.length,
+    user_phone: doc.user?.phone,
+    user_phone_length: doc.user?.phone?.length
+  });
+  
   return doc;
 }
 

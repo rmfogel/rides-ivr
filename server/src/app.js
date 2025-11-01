@@ -9,6 +9,7 @@ import { healthRouter } from './routes/health.js';
 import { voiceRouter } from './routes/voice.js';
 import { manageRouter } from './routes/manage.js';
 import { duplicateRouter } from './routes/duplicate.js';
+import { registerRouter } from './routes/register.js';
 import { collections, getDb } from './db/mongoClient.js';
 import * as logger from './utils/logger.js';
 
@@ -63,6 +64,7 @@ app.use('/health', healthRouter);
 app.use('/voice', voiceRouter);
 app.use('/voice/manage', manageRouter);
 app.use('/voice/manage/duplicate', duplicateRouter);
+app.use('/api/register', registerRouter);
 
 // Serve static files (recorded prompts) from /public under /static
 const __filename = fileURLToPath(import.meta.url);
