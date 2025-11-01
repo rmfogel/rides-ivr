@@ -7,7 +7,7 @@ export const HEBREW_TRANSLATIONS = {
   processing: 'מעבד את הבקשה שלך, אנא המתן.',
   
   // Main menu
-  mainMenu: 'לנהג הקש 1. לנוסע הקש 2. לניהול הקש 3.',
+  mainMenu: 'לנהג הקש 1. לנוסע הקש 2. לעדכון נסיעות שנשמרו הקש 3.',
   
   // Driver flow
   driverWelcome: 'שלום נהג, אנו שמחים לראות אותך.',
@@ -37,7 +37,13 @@ export const HEBREW_TRANSLATIONS = {
   
   // Management
   managementWelcome: 'ברוכים הבאים למערכת הניהול.',
-  managementPrompt: 'לבדיקת סטטיסטיקות הקש 1. לטיפול בדיווחים הקש 2. למחיקת נסיעה הקש 3.',
+  managementPrompt: 'למחיקת נסיעות הקש 1.',
+  noActiveRides: 'אין לך נסיעות פעילות.',
+  chooseDriverOrRiderRides: 'לניהול נסיעות כנהג הקש 1. לניהול נסיעות כנוסע הקש 2.',
+  rideDetailsIntro: 'פרטי הנסיעה:',
+  press1Delete2Next9Exit: 'למחיקת הנסיעה הקש 1. לנסיעה הבאה הקש 2. לחזרה הקש 9.',
+  confirmDeleteRide: 'האם אתה בטוח שברצונך למחוק את הנסיעה? הקש 1 לאישור או 2 לביטול.',
+  rideDeletedSuccessfully: 'הנסיעה נמחקה בהצלחה.',
   
   // Errors
   generalError: 'אירעה שגיאה. אנא נסה שוב מאוחר יותר.',

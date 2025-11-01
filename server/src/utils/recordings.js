@@ -81,6 +81,15 @@ export const PROMPT_IDS = {
   driver_declined: '123',
   info_not_available: '124',
 
+  // Management menu
+  manage_menu: '130',
+  no_active_rides: '131',
+  choose_driver_or_rider_rides: '132',
+  ride_details_intro: '133',
+  press_1_delete_2_next_9_exit: '134',
+  confirm_delete_ride: '135',
+  ride_deleted_successfully: '136',
+
   // Small building blocks
   the_time_is: '200',
   between: '201',

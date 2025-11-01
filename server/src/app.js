@@ -72,8 +72,9 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, '..', 'public');
 app.use('/static', express.static(publicDir));
 
+// Serve registration form as home page
 app.get('/', (req, res) => {
-  res.send('Rides IVR server is running');
+  res.sendFile(path.join(publicDir, 'register.html'));
 });
 
 app.use((err, req, res, next) => {

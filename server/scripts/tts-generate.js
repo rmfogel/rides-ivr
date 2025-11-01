@@ -34,8 +34,15 @@ const VOICES = {
 const PROMPTS = {
   he: {
     welcome: 'ברוכים הבאים לשירות הנסיעות.',
-    main_menu: 'לנהג הקש 1. לנוסע הקש 2. לניהול הקש 3.',
-    invalid: 'קלט לא תקין.'
+    main_menu: 'לנהג הקש 1. לנוסע הקש 2. לעדכון נסיעות שנשמרו הקש 3.',
+    invalid: 'קלט לא תקין.',
+    manage_menu: 'למחיקת נסיעות הקש 1.',
+    no_active_rides: 'אין לך נסיעות פעילות.',
+    choose_driver_or_rider_rides: 'לניהול נסיעות כנהג הקש 1. לניהול נסיעות כנוסע הקש 2.',
+    ride_details_intro: 'פרטי הנסיעה:',
+    press_1_delete_2_next_9_exit: 'למחיקת הנסיעה הקש 1. לנסיעה הבאה הקש 2. לחזרה הקש 9.',
+    confirm_delete_ride: 'האם אתה בטוח שברצונך למחוק את הנסיעה? הקש 1 לאישור או 2 לביטול.',
+    ride_deleted_successfully: 'הנסיעה נמחקה בהצלחה.'
   },
   en: {
     welcome: 'Welcome to the ride service.',

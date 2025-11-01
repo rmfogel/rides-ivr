@@ -196,6 +196,100 @@
             border-right: 4px solid #4caf50;
         }
 
+        .warning-message {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 24px;
+            display: none;
+            border-right: 4px solid #ffc107;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 0;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            background-color: #673ab7;
+            color: white;
+            padding: 16px 24px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .modal-body {
+            padding: 24px;
+            line-height: 1.6;
+        }
+
+        .modal-body p {
+            margin-bottom: 12px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #dadce0;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-button {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            font-weight: 500;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .modal-button-primary {
+            background-color: #673ab7;
+            color: white;
+        }
+
+        .modal-button-primary:hover {
+            background-color: #5e35b1;
+        }
+
+        .modal-button-secondary {
+            background-color: #e0e0e0;
+            color: #202124;
+        }
+
+        .modal-button-secondary:hover {
+            background-color: #d5d5d5;
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 0;
@@ -239,6 +333,10 @@
                 ההרשמה הושלמה בהצלחה! נציג יצור איתך קשר בקרוב.
             </div>
 
+            <div class="warning-message" id="warningMessage">
+                מספר הטלפון כבר רשום במערכת.
+            </div>
+
             <form id="registrationForm" novalidate>
                 <div class="form-group">
                     <label class="form-label">
@@ -252,7 +350,7 @@
                         name="firstName" 
                         placeholder="First Name"
                         required
-                        pattern="[A-Za-z\s-']+"
+                        pattern="[A-Za-z\s'\-]+"
                         dir="ltr"
                         style="text-align: left;"
                     >
@@ -272,7 +370,7 @@
                         name="lastName" 
                         placeholder="Last Name"
                         required
-                        pattern="[A-Za-z\s-']+"
+                        pattern="[A-Za-z\s'\-]+"
                         dir="ltr"
                         style="text-align: left;"
                     >
@@ -290,11 +388,12 @@
                         class="form-input" 
                         id="phone" 
                         name="phone" 
-                        placeholder="050-1234567"
+                        placeholder="0501234567"
                         required
+                        pattern="0\d{9}"
                     >
-                    <div class="form-helper">פורמט: 050-1234567 או 0501234567</div>
-                    <div class="error-message" id="phoneError">נא להזין מספר טלפון תקין</div>
+                    <div class="form-helper">פורמט: 0501234567 (10 ספרות, ללא מקפים)</div>
+                    <div class="error-message" id="phoneError">נא להזין מספר טלפון תקין (10 ספרות)</div>
                 </div>
 
                 <div class="form-group">
@@ -321,15 +420,41 @@
         </div>
     </div>
 
+    <!-- Modal for confirming update -->
+    <div id="updateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>מספר טלפון קיים</h2>
+            </div>
+            <div class="modal-body">
+                <p><strong>מספר הטלפון כבר רשום במערכת.</strong></p>
+                <p id="existingUserInfo"></p>
+                <p>האם ברצונך לעדכן את הפרטים?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="modal-button modal-button-secondary" id="cancelUpdate">ביטול</button>
+                <button type="button" class="modal-button modal-button-primary" id="confirmUpdate">עדכן פרטים</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const form = document.getElementById('registrationForm');
         const submitButton = document.getElementById('submitButton');
         const clearButton = document.getElementById('clearButton');
         const successMessage = document.getElementById('successMessage');
+        const warningMessage = document.getElementById('warningMessage');
+        const updateModal = document.getElementById('updateModal');
+        const cancelUpdate = document.getElementById('cancelUpdate');
+        const confirmUpdate = document.getElementById('confirmUpdate');
+        const existingUserInfo = document.getElementById('existingUserInfo');
+
+        let isUpdateMode = false;
+        let existingPhone = null;
 
         // Phone validation
         function validatePhone(phone) {
-            const phoneRegex = /^0\d{1,2}-?\d{7}$/;
+            const phoneRegex = /^0\d{9}$/;
             return phoneRegex.test(phone.replace(/\s/g, ''));
         }
 
@@ -341,7 +466,7 @@
 
         // English name validation
         function validateEnglishName(name) {
-            const englishNameRegex = /^[A-Za-z\s'-]+$/;
+            const englishNameRegex = /^[A-Za-z\s'\-]+$/;
             return englishNameRegex.test(name);
         }
 
@@ -400,7 +525,7 @@
             // Phone
             const phone = document.getElementById('phone').value.trim();
             if (!phone || !validatePhone(phone)) {
-                showError('phone', 'נא להזין מספר טלפון תקין');
+                showError('phone', 'נא להזין מספר טלפון תקין (10 ספרות)');
                 isValid = false;
             }
 
@@ -435,23 +560,95 @@
                 timestamp: new Date().toISOString()
             };
 
+            // Check if phone number already exists
+            try {
+                const cleanPhone = formData.phone.replace(/\s|-/g, '');
+                const checkResponse = await fetch(`/api/register/check/${cleanPhone}`);
+                const checkData = await checkResponse.json();
+
+                if (checkData.exists) {
+                    // Show modal to ask if user wants to update
+                    existingPhone = cleanPhone;
+                    if (checkData.user) {
+                        existingUserInfo.innerHTML = `
+                            <strong>שם:</strong> ${checkData.user.fullName}<br>
+                            <strong>דוא"ל:</strong> ${checkData.user.email || 'לא צוין'}<br>
+                            <strong>תאריך רישום:</strong> ${new Date(checkData.user.createdAt).toLocaleDateString('he-IL')}
+                        `;
+                    } else {
+                        existingUserInfo.textContent = 'נמצא רישום קיים למספר טלפון זה.';
+                    }
+                    updateModal.style.display = 'block';
+                    return;
+                }
+
+                // If phone doesn't exist, proceed with registration
+                await submitRegistration(formData, false);
+
+            } catch (error) {
+                console.error('Error checking phone number:', error);
+                // If check fails, try to submit anyway
+                await submitRegistration(formData, false);
+            }
+        });
+
+        // Modal handlers
+        cancelUpdate.addEventListener('click', () => {
+            updateModal.style.display = 'none';
+            existingPhone = null;
+            isUpdateMode = false;
+        });
+
+        confirmUpdate.addEventListener('click', async () => {
+            updateModal.style.display = 'none';
+            
+            const formData = {
+                firstName: document.getElementById('firstName').value.trim(),
+                lastName: document.getElementById('lastName').value.trim(),
+                fullName: document.getElementById('firstName').value.trim() + ' ' + document.getElementById('lastName').value.trim(),
+                phone: existingPhone,
+                email: document.getElementById('email').value.trim(),
+                timestamp: new Date().toISOString()
+            };
+
+            await submitRegistration(formData, true);
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (event) => {
+            if (event.target === updateModal) {
+                updateModal.style.display = 'none';
+                existingPhone = null;
+                isUpdateMode = false;
+            }
+        });
+
+        // Submit registration function
+        async function submitRegistration(formData, isUpdate) {
             // Disable button during submission
             submitButton.disabled = true;
-            submitButton.textContent = 'שולח...';
+            submitButton.textContent = isUpdate ? 'מעדכן...' : 'שולח...';
 
             try {
                 // Send to backend
+                const method = isUpdate ? 'PUT' : 'POST';
                 const response = await fetch('/api/register', {
-                    method: 'POST',
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(formData)
                 });
 
+                const data = await response.json();
+
                 if (response.ok) {
                     // Show success message
+                    successMessage.textContent = isUpdate 
+                        ? 'הפרטים עודכנו בהצלחה!' 
+                        : 'ההרשמה הושלמה בהצלחה! נציג יצור איתך קשר בקרוב.';
                     successMessage.style.display = 'block';
+                    warningMessage.style.display = 'none';
                     form.reset();
                     
                     // Scroll to success message
@@ -462,7 +659,13 @@
                         successMessage.style.display = 'none';
                     }, 5000);
                 } else {
-                    alert('אירעה שגיאה בשליחת הטופס. אנא נסה שוב.');
+                    if (response.status === 409) {
+                        warningMessage.textContent = 'מספר הטלפון כבר רשום במערכת.';
+                        warningMessage.style.display = 'block';
+                        successMessage.style.display = 'none';
+                    } else {
+                        alert('אירעה שגיאה בשליחת הטופס: ' + (data.error || 'שגיאה לא ידועה'));
+                    }
                 }
             } catch (error) {
                 console.error('Error submitting form:', error);
@@ -470,14 +673,17 @@
             } finally {
                 submitButton.disabled = false;
                 submitButton.textContent = 'שלח';
+                existingPhone = null;
+                isUpdateMode = false;
             }
-        });
+        }
 
         // Clear form handler
         clearButton.addEventListener('click', () => {
             if (confirm('האם אתה בטוח שברצונך לנקות את הטופס?')) {
                 form.reset();
                 successMessage.style.display = 'none';
+                warningMessage.style.display = 'none';
                 
                 // Clear all errors
                 ['firstName', 'lastName', 'phone', 'email'].forEach(clearError);

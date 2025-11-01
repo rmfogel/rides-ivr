@@ -119,6 +119,102 @@ registerRouter.post('/', async (req, res) => {
 });
 
 /**
+ * PUT /api/register
+ * Update existing registration by phone number
+ */
+registerRouter.put('/', async (req, res) => {
+  try {
+    const {
+      fullName,
+      phone,
+      email,
+      timestamp
+    } = req.body;
+
+    // Validate required fields
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Phone number is required'
+      });
+    }
+
+    // Validate phone format
+    const phoneRegex = /^0\d{1,2}-?\d{7}$/;
+    const cleanPhone = phone.replace(/\s/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid phone number format'
+      });
+    }
+
+    // Validate email if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid email format'
+        });
+      }
+    }
+
+    // Get registrations collection
+    const { registrations } = await collections();
+
+    // Check if phone number exists
+    const existingUser = await registrations.findOne({ phone: cleanPhone });
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'Phone number not found'
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      updatedAt: new Date()
+    };
+
+    if (fullName) {
+      updateData.fullName = fullName.trim();
+    }
+    if (email) {
+      updateData.email = email.trim().toLowerCase();
+    }
+
+    // Update registration
+    const result = await registrations.updateOne(
+      { phone: cleanPhone },
+      { $set: updateData }
+    );
+
+    logger.info('Registration updated', {
+      phone: cleanPhone,
+      modifiedCount: result.modifiedCount
+    });
+
+    res.json({
+      success: true,
+      message: 'Registration updated successfully',
+      modifiedCount: result.modifiedCount
+    });
+
+  } catch (error) {
+    logger.error('Error updating registration', {
+      error: error.message,
+      stack: error.stack
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+/**
  * GET /api/register/check/:phone
  * Check if a phone number is already registered
  */
@@ -132,7 +228,12 @@ registerRouter.get('/check/:phone', async (req, res) => {
 
     res.json({
       exists: !!existingUser,
-      phone: cleanPhone
+      phone: cleanPhone,
+      user: existingUser ? {
+        fullName: existingUser.fullName,
+        email: existingUser.email,
+        createdAt: existingUser.createdAt
+      } : null
     });
 
   } catch (error) {
