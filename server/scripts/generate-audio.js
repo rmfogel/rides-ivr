@@ -93,9 +93,13 @@ async function generateAudioFile(id, text) {
   }
 
   try {
+    // Check if text contains SSML tags or Hebrew vowel marks (nikud)
+    const hasSSML = text.includes('<') && text.includes('>');
+    const hasNikud = /[\u0591-\u05C7]/.test(text); // Hebrew vowel marks range
+    
     // Construct the request
     const request = {
-      input: { text },
+      input: hasSSML ? { ssml: text } : { text },
       voice: CONFIG.voice,
       audioConfig: CONFIG.audioConfig
     };
