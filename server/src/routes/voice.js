@@ -910,10 +910,8 @@ voiceRouter.post('/rider-confirm', (req, res) => {
   
   // Time range - play earliest to latest
   if (earliest) {
-    playPrompt(twiml, 'between');
     const earliestStr = earliest.replace(':', '');
     playHHMM(twiml, earliestStr);
-    playPrompt(twiml, 'and');
     const latestStr = latest.replace(':', '');
     playHHMM(twiml, latestStr);
   }
@@ -1631,7 +1629,6 @@ voiceRouter.post('/driver-confirm', (req, res) => {
   
   // Time - play the departure time
   if (time) {
-    playPrompt(twiml, 'at');
     const timeStr = time.replace(':', '');
     playHHMM(twiml, timeStr);
   }
