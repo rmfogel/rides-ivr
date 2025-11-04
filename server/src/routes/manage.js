@@ -1,11 +1,19 @@
 import { Router } from 'express';
 import twilio from 'twilio';
 import { say } from '../utils/twiml.js';
-import { playPrompt } from '../utils/recordings.js';
-import { getSession, patchSession } from '../store/session.js';
-import { getActiveOffersByDriverPhone, getActiveRequestsByRiderPhone, cancelOffer, cancelRequest } from '../db/repo.js';
+import { playPrompt, playHHMM, playDigits } from '../utils/recordings.js';
+import { 
+  getActiveOffersByDriverPhone, 
+  getActiveRequestsByRiderPhone, 
+  cancelOffer, 
+  cancelRequest,
+  getMatchesByOfferId,
+  getMatchesByRequestId
+} from '../db/repo.js';
 import { formatRideDetails } from '../utils/formatting.js';
 import logger from '../utils/logger.js';
+import { DateTime } from 'luxon';
+import { TZ } from '../utils/time.js';
 
 export const manageRouter = Router();
 
@@ -21,69 +29,92 @@ function normalizeIsraeliPhone(phone) {
   return cleaned;
 }
 
-// Management menu - entry point
+/**
+ * Helper function to describe a ride (offer or request) using audio prompts
+ */
+async function describeRide(twimlNode, ride, isOffer) {
+  // Direction
+  if (ride.direction === 'FROM') {
+    playPrompt(twimlNode, 'direction_from'); // מהישוב
+  } else {
+    playPrompt(twimlNode, 'direction_to'); // לישוב
+  }
+  
+  if (isOffer) {
+    // For offers: departure time
+    const departureTime = DateTime.fromJSDate(ride.departure_time).setZone(TZ);
+    playPrompt(twimlNode, 'departure_at'); // יציאה בשעה
+    playHHMM(twimlNode, departureTime.toFormat('HHmm'));
+  } else {
+    // For requests: time window
+    const earliestTime = DateTime.fromJSDate(ride.earliest_time).setZone(TZ);
+    const latestTime = DateTime.fromJSDate(ride.latest_time).setZone(TZ);
+    playPrompt(twimlNode, 'time_window'); // בין השעות
+    playHHMM(twimlNode, earliestTime.toFormat('HHmm'));
+    playPrompt(twimlNode, 'and');
+    playHHMM(twimlNode, latestTime.toFormat('HHmm'));
+  }
+}
+
+// Management menu - entry point from main menu option 3
 manageRouter.post('/menu', async (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const phone = normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
-  const callSid = req.body.CallSid || 'no-sid';
-  const digits = req.body.Digits || '';
   
-  logger.info('Management menu accessed', { phone, callSid, digits });
+  logger.info('Management menu accessed', { phone, callSid: req.body.CallSid });
   
   try {
-    if (digits === '1') {
-      // Option 1: Delete rides - check what type of rides the user has
-      const offers = await getActiveOffersByDriverPhone(phone);
-      const requests = await getActiveRequestsByRiderPhone(phone);
+    // Get active rides for this phone number
+    const offers = await getActiveOffersByDriverPhone(phone);
+    const requests = await getActiveRequestsByRiderPhone(phone);
+    const totalRides = offers.length + requests.length;
+    
+    if (totalRides === 0) {
+      // No active rides
+      playPrompt(twiml, 'no_active_rides');
+      playPrompt(twiml, 'thanks_goodbye');
+      twiml.hangup();
+    } else if (totalRides === 1) {
+      // Only one ride - go straight to asking if they want to delete it
+      const ride = offers.length > 0 ? offers[0] : requests[0];
+      const isOffer = offers.length > 0;
       
-      if (offers.length === 0 && requests.length === 0) {
-        playPrompt(twiml, 'no_active_rides');
-        playPrompt(twiml, 'thanks_goodbye');
-        twiml.hangup();
-      } else if (offers.length > 0 && requests.length === 0) {
-        // Only driver rides
-        patchSession(callSid, { 
-          step: 'manage_delete_driver_rides', 
-          data: { offers, currentIndex: 0, phone } 
-        });
-        twiml.redirect('/voice/manage/delete-rides');
-      } else if (requests.length > 0 && offers.length === 0) {
-        // Only rider rides
-        patchSession(callSid, { 
-          step: 'manage_delete_rider_rides', 
-          data: { requests, currentIndex: 0, phone } 
-        });
-        twiml.redirect('/voice/manage/delete-rides');
-      } else {
-        // Both types - ask which to manage
-        patchSession(callSid, { 
-          step: 'manage_choose_ride_type', 
-          data: { offers, requests, phone } 
-        });
-        const gather = twiml.gather({
-          input: 'dtmf',
-          numDigits: 1,
-          timeout: 10,
-          action: '/voice/manage/choose-type'
-        });
-        playPrompt(gather, 'choose_driver_or_rider_rides');
-        playPrompt(twiml, 'thanks_goodbye');
-        twiml.hangup();
-      }
-    } else {
-      // Show menu
+      // Show notice about no editing
+      playPrompt(twiml, 'cannot_edit_must_delete_recreate');
+      
+      // Describe the ride
+      await describeRide(twiml, ride, isOffer);
+      
+      // Ask if they want to delete
       const gather = twiml.gather({
         input: 'dtmf',
         numDigits: 1,
         timeout: 10,
-        action: '/voice/manage/menu'
+        action: `/voice/manage/delete-single?id=${ride.id}&type=${isOffer ? 'offer' : 'request'}`
       });
-      playPrompt(gather, 'manage_menu');
+      playPrompt(gather, 'press_1_yes_delete_2_cancel');
+      playPrompt(twiml, 'thanks_goodbye');
+      twiml.hangup();
+    } else if (offers.length > 0 && requests.length === 0) {
+      // Multiple driver rides only
+      twiml.redirect(`/voice/manage/list-rides?type=offer&index=0&phone=${encodeURIComponent(phone)}`);
+    } else if (requests.length > 0 && offers.length === 0) {
+      // Multiple rider rides only
+      twiml.redirect(`/voice/manage/list-rides?type=request&index=0&phone=${encodeURIComponent(phone)}`);
+    } else {
+      // Both types - ask which to manage
+      const gather = twiml.gather({
+        input: 'dtmf',
+        numDigits: 1,
+        timeout: 10,
+        action: `/voice/manage/choose-type?phone=${encodeURIComponent(phone)}`
+      });
+      playPrompt(gather, 'choose_driver_or_rider_rides');
       playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     }
   } catch (error) {
-    logger.error('Error in management menu', { error: error.message });
+    logger.error('Error in management menu', { error: error.message, stack: error.stack });
     playPrompt(twiml, 'error_generic_try_later');
     twiml.hangup();
   }
@@ -94,37 +125,23 @@ manageRouter.post('/menu', async (req, res) => {
 // Choose ride type (driver or rider)
 manageRouter.post('/choose-type', async (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const callSid = req.body.CallSid || 'no-sid';
   const digits = req.body.Digits || '';
-  let session = getSession(callSid);
-  
-  if (!session || session.step !== 'manage_choose_ride_type') {
-    twiml.redirect('/voice/manage/menu');
-    return res.type('text/xml').send(twiml.toString());
-  }
+  const phone = req.query.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   
   try {
     if (digits === '1') {
-      // Manage driver rides
-      patchSession(callSid, { 
-        step: 'manage_delete_driver_rides', 
-        data: { ...session.data, currentIndex: 0 } 
-      });
-      twiml.redirect('/voice/manage/delete-rides');
+      // Manage driver rides (offers)
+      twiml.redirect(`/voice/manage/list-rides?type=offer&index=0&phone=${encodeURIComponent(phone)}`);
     } else if (digits === '2') {
-      // Manage rider rides
-      patchSession(callSid, { 
-        step: 'manage_delete_rider_rides', 
-        data: { ...session.data, currentIndex: 0 } 
-      });
-      twiml.redirect('/voice/manage/delete-rides');
+      // Manage rider rides (requests)
+      twiml.redirect(`/voice/manage/list-rides?type=request&index=0&phone=${encodeURIComponent(phone)}`);
     } else {
       // Invalid input
       const gather = twiml.gather({
         input: 'dtmf',
         numDigits: 1,
         timeout: 10,
-        action: '/voice/manage/choose-type'
+        action: `/voice/manage/choose-type?phone=${encodeURIComponent(phone)}`
       });
       playPrompt(gather, 'invalid_input');
       playPrompt(gather, 'choose_driver_or_rider_rides');
@@ -140,81 +157,95 @@ manageRouter.post('/choose-type', async (req, res) => {
   res.type('text/xml').send(twiml.toString());
 });
 
-// List rides for deletion
-manageRouter.post('/delete-rides', async (req, res) => {
+// List rides with navigation
+manageRouter.post('/list-rides', async (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const callSid = req.body.CallSid || 'no-sid';
   const digits = req.body.Digits || '';
-  let session = getSession(callSid);
+  const type = req.query.type || '';
+  let index = parseInt(req.query.index || '0', 10);
+  const phone = req.query.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   
-  if (!session || (!session.step.includes('manage_delete'))) {
-    twiml.redirect('/voice/manage/menu');
-    return res.type('text/xml').send(twiml.toString());
-  }
+  logger.info('List rides', { phone, type, index, digits });
   
   try {
-    const isDriver = session.step === 'manage_delete_driver_rides';
-    const rides = isDriver ? session.data.offers : session.data.requests;
-    let currentIndex = session.data.currentIndex || 0;
+    // Get rides
+    const rides = type === 'offer' 
+      ? await getActiveOffersByDriverPhone(phone)
+      : await getActiveRequestsByRiderPhone(phone);
+    
+    if (rides.length === 0) {
+      playPrompt(twiml, 'no_active_rides');
+      playPrompt(twiml, 'thanks_goodbye');
+      twiml.hangup();
+      return res.type('text/xml').send(twiml.toString());
+    }
     
     // Handle input
     if (digits === '1') {
       // Delete this ride
-      const ride = rides[currentIndex];
+      const ride = rides[index];
       if (ride) {
-        patchSession(callSid, { 
-          step: 'manage_confirm_delete', 
-          data: { ...session.data, selectedRide: ride, isDriver } 
-        });
-        const gather = twiml.gather({
-          input: 'dtmf',
-          numDigits: 1,
-          timeout: 10,
-          action: '/voice/manage/confirm-delete'
-        });
-        playPrompt(gather, 'confirm_delete_ride');
-        playPrompt(twiml, 'thanks_goodbye');
-        twiml.hangup();
+        twiml.redirect(`/voice/manage/confirm-delete?id=${ride.id}&type=${type}&phone=${encodeURIComponent(phone)}`);
         return res.type('text/xml').send(twiml.toString());
       }
     } else if (digits === '2') {
       // Next ride
-      currentIndex = (currentIndex + 1) % rides.length;
-      patchSession(callSid, { 
-        step: session.step, 
-        data: { ...session.data, currentIndex } 
-      });
+      index = (index + 1) % rides.length;
     } else if (digits === '9') {
-      // Return to menu
+      // Exit
       playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
       return res.type('text/xml').send(twiml.toString());
     }
     
     // Display current ride
-    if (rides.length === 0) {
-      playPrompt(twiml, 'no_active_rides');
-      playPrompt(twiml, 'thanks_goodbye');
-      twiml.hangup();
+    const ride = rides[index];
+    
+    // Show notice about no editing
+    playPrompt(twiml, 'cannot_edit_must_delete_recreate');
+    
+    // Describe the ride
+    await describeRide(twiml, ride, type === 'offer');
+    
+    // Options
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: `/voice/manage/list-rides?type=${type}&index=${index}&phone=${encodeURIComponent(phone)}`
+    });
+    playPrompt(gather, 'press_1_delete_2_next_9_exit');
+    playPrompt(twiml, 'thanks_goodbye');
+    twiml.hangup();
+  } catch (error) {
+    logger.error('Error in list rides', { error: error.message, stack: error.stack });
+    playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
+  }
+  
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Delete a single ride (when there's only one)
+manageRouter.post('/delete-single', async (req, res) => {
+  const twiml = new twilio.twiml.VoiceResponse();
+  const digits = req.body.Digits || '';
+  const id = req.query.id || '';
+  const type = req.query.type || '';
+  
+  logger.info('Delete single ride', { id, type, digits });
+  
+  try {
+    if (digits === '1') {
+      // User confirmed deletion
+      twiml.redirect(`/voice/manage/do-delete?id=${id}&type=${type}`);
     } else {
-      const ride = rides[currentIndex];
-      const gather = twiml.gather({
-        input: 'dtmf',
-        numDigits: 1,
-        timeout: 10,
-        action: '/voice/manage/delete-rides'
-      });
-      
-      // Announce ride details (simplified for now)
-      playPrompt(gather, 'ride_details_intro');
-      
-      // Options
-      playPrompt(gather, 'press_1_delete_2_next_9_exit');
+      // User cancelled
       playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     }
   } catch (error) {
-    logger.error('Error in delete rides flow', { error: error.message });
+    logger.error('Error in delete single', { error: error.message });
     playPrompt(twiml, 'error_generic_try_later');
     twiml.hangup();
   }
@@ -225,42 +256,39 @@ manageRouter.post('/delete-rides', async (req, res) => {
 // Confirm deletion
 manageRouter.post('/confirm-delete', async (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const callSid = req.body.CallSid || 'no-sid';
-  const digits = req.body.Digits || '';
-  let session = getSession(callSid);
+  const id = req.query.id || '';
+  const type = req.query.type || '';
+  const phone = req.query.phone || '';
   
-  if (!session || session.step !== 'manage_confirm_delete' || !session.data.selectedRide) {
-    twiml.redirect('/voice/manage/menu');
-    return res.type('text/xml').send(twiml.toString());
-  }
+  logger.info('Confirm delete ride', { id, type });
   
   try {
-    if (digits === '1') {
-      // Confirm deletion
-      const ride = session.data.selectedRide;
-      const isDriver = session.data.isDriver;
-      
-      if (isDriver) {
-        await cancelOffer(ride.id);
-      } else {
-        await cancelRequest(ride.id);
-      }
-      
-      logger.info('Ride deleted', { rideId: ride.id, isDriver, phone: session.data.phone });
-      playPrompt(twiml, 'ride_deleted_successfully');
-      playPrompt(twiml, 'thanks_goodbye');
-      twiml.hangup();
-    } else {
-      // Cancel deletion, return to list
-      const step = session.data.isDriver ? 'manage_delete_driver_rides' : 'manage_delete_rider_rides';
-      patchSession(callSid, { 
-        step, 
-        data: { ...session.data, selectedRide: null } 
-      });
-      twiml.redirect('/voice/manage/delete-rides');
+    // Check if ride has active matches
+    const matches = type === 'offer' 
+      ? await getMatchesByOfferId(id)
+      : await getMatchesByRequestId(id);
+    
+    const activeMatches = matches.filter(m => 
+      m.status === 'accepted' || m.status === 'pending' || m.status === 'notified'
+    );
+    
+    if (activeMatches.length > 0) {
+      // Ride has active matches - warn user
+      playPrompt(twiml, 'ride_has_match_notify_other'); // הנסיעה שובצה! עליך ליידע את הצד השני
+      playPrompt(twiml, 'match_will_be_cancelled'); // השיבוץ יבוטל ויפתח מחדש לאחרים
     }
+    
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 10,
+      action: `/voice/manage/do-delete?id=${id}&type=${type}&phone=${encodeURIComponent(phone)}`
+    });
+    playPrompt(gather, 'press_1_yes_delete_2_cancel');
+    playPrompt(twiml, 'thanks_goodbye');
+    twiml.hangup();
   } catch (error) {
-    logger.error('Error confirming deletion', { error: error.message });
+    logger.error('Error confirming deletion', { error: error.message, stack: error.stack });
     playPrompt(twiml, 'error_generic_try_later');
     twiml.hangup();
   }
@@ -268,139 +296,53 @@ manageRouter.post('/confirm-delete', async (req, res) => {
   res.type('text/xml').send(twiml.toString());
 });
 
-// Handle listing of rides for cancellation or duplication
-manageRouter.post('/list-rides', async (req, res) => {
+// Actually delete the ride
+manageRouter.post('/do-delete', async (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  const callSid = req.body.CallSid || 'no-sid';
-  const d = (req.body.Digits || '').trim();
-  let session = getSession(callSid);
+  const digits = req.body.Digits || '';
+  const id = req.query.id || '';
+  const type = req.query.type || '';
   
-  if (!session || !session.step.startsWith('manage_list')) {
-    twiml.redirect('/voice/manage');
-    return res.type('text/xml').send(twiml.toString());
-  }
+  logger.info('Do delete ride', { id, type, digits });
   
   try {
-    let index = session.currentIndex || 0;
-    const isCancel = session.step === 'manage_list_rides';
-    const isDuplicate = session.step === 'manage_list_to_duplicate';
-    
-    // If digits received, process them
-    if (d) {
-      if (d === '1') {
-        // Select this ride
-        if (isCancel) {
-          if (session.data.cancelType === 'driver') {
-            const ride = session.data.offers[index];
-            if (ride) {
-              session.data.selectedRide = ride;
-              patchSession(callSid, { step: 'manage_confirm_cancel', data: session.data });
-              const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 8, action: '/voice/manage/confirm-cancel' });
-              playPrompt(g, 'press_1_confirm_2_restart');
-              return res.type('text/xml').send(twiml.toString());
-            }
-          } else {
-            const ride = session.data.requests[index];
-            if (ride) {
-              session.data.selectedRide = ride;
-              patchSession(callSid, { step: 'manage_confirm_cancel', data: session.data });
-              const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 8, action: '/voice/manage/confirm-cancel' });
-              playPrompt(g, 'press_1_confirm_2_restart');
-              return res.type('text/xml').send(twiml.toString());
-            }
-          }
-        }
-        // Logic for duplicating rides
-        if (isDuplicate) {
-          const lastRide = session.data.lastRide;
-          if (lastRide) {
-            session.data.selectedRide = lastRide;
-            patchSession(callSid, { step: 'manage_duplicate_date', data: session.data });
-            const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 6, action: '/voice/manage/duplicate-date' });
-            const isOffer = session.data.duplicateType === 'driver';
-            playPrompt(g, 'press_1_confirm_2_restart');
-            return res.type('text/xml').send(twiml.toString());
-          }
-        }
-      } else if (d === '2') {
-        // Next ride
-        if (isCancel) {
-          const items = session.data.cancelType === 'driver' ? session.data.offers : session.data.requests;
-          index = (index + 1) % items.length;
-          patchSession(callSid, { currentIndex: index });
-        }
-      } else if (d === '9') {
-        // Return to menu
-        patchSession(callSid, { step: 'manage_main_menu', data: session.data });
-        twiml.redirect('/voice/manage');
-        return res.type('text/xml').send(twiml.toString());
-      }
-    }
-    
-    // Display current ride
-    if (isCancel) {
-      const items = session.data.cancelType === 'driver' ? session.data.offers : session.data.requests;
-      if (!items || index >= items.length) {
-  playPrompt(twiml, 'info_not_available');
-        patchSession(callSid, { step: 'manage_main_menu', data: session.data });
-        twiml.redirect('/voice/manage');
-        return res.type('text/xml').send(twiml.toString());
-      }
+    if (digits === '1' || digits === '') {
+      // Confirm deletion (or came from delete-single)
       
-      const ride = items[index];
-      const g = twiml.gather({ input: 'dtmf', numDigits: 1, timeout: 8, action: '/voice/manage/list-rides' });
-      const isOffer = session.data.cancelType === 'driver';
-  playPrompt(g, 'press_1_confirm_2_restart');
-    }
-    
-    // If we're listing rides for duplication, similar logic would go here
-    
-  } catch (error) {
-    console.error('Error in list-rides flow:', error);
-  playPrompt(twiml, 'error_generic_try_later');
-    twiml.redirect('/voice/manage');
-  }
-  
-  res.type('text/xml').send(twiml.toString());
-});
-
-manageRouter.post('/confirm-cancel', async (req, res) => {
-  const twiml = new twilio.twiml.VoiceResponse();
-  const callSid = req.body.CallSid || 'no-sid';
-  const d = (req.body.Digits || '').trim();
-  let session = getSession(callSid);
-  
-  if (!session || session.step !== 'manage_confirm_cancel' || !session.data.selectedRide) {
-    twiml.redirect('/voice/manage');
-    return res.type('text/xml').send(twiml.toString());
-  }
-  
-  try {
-    if (d === '1') {
-      // Confirm cancellation
-      const ride = session.data.selectedRide;
-      const isOffer = session.data.cancelType === 'driver';
+      // Check if ride has active matches
+      const matches = type === 'offer' 
+        ? await getMatchesByOfferId(id)
+        : await getMatchesByRequestId(id);
       
-      if (isOffer) {
-        await cancelOffer(ride.id);
-  playPrompt(twiml, 'thanks_goodbye');
+      const hasActiveMatches = matches.some(m => 
+        m.status === 'accepted' || m.status === 'pending' || m.status === 'notified'
+      );
+      
+      // Delete the ride (this will also cancel associated matches via cancelOffer/cancelRequest)
+      if (type === 'offer') {
+        await cancelOffer(id);
       } else {
-        await cancelRequest(ride.id);
-  playPrompt(twiml, 'thanks_goodbye');
+        await cancelRequest(id);
       }
       
-      patchSession(callSid, { step: 'manage_main_menu', data: session.data });
-      twiml.redirect('/voice/manage');
+      logger.info('Ride deleted successfully', { id, type, hadMatches: hasActiveMatches });
+      
+      if (hasActiveMatches) {
+        playPrompt(twiml, 'ride_with_match_deleted'); // נסיעה משובצת נמחקה בהצלחה
+      } else {
+        playPrompt(twiml, 'ride_deleted_successfully');
+      }
+      playPrompt(twiml, 'thanks_goodbye');
+      twiml.hangup();
     } else {
-      // Return without cancelling
-      patchSession(callSid, { step: 'manage_main_menu', data: session.data });
-      twiml.redirect('/voice/manage');
+      // User cancelled deletion
+      playPrompt(twiml, 'thanks_goodbye');
+      twiml.hangup();
     }
   } catch (error) {
-    console.error('Error in confirm-cancel flow:', error);
-  playPrompt(twiml, 'error_generic_try_later');
-    patchSession(callSid, { step: 'manage_main_menu', data: session.data });
-    twiml.redirect('/voice/manage');
+    logger.error('Error deleting ride', { error: error.message, stack: error.stack });
+    playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
   }
   
   res.type('text/xml').send(twiml.toString());

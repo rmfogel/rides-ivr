@@ -89,6 +89,18 @@ export const PROMPT_IDS = {
   press_1_delete_2_next_9_exit: '134',
   confirm_delete_ride: '135',
   ride_deleted_successfully: '136',
+  
+  // New management prompts
+  cannot_edit_must_delete_recreate: '140', // אי אפשר לערוך נסיעה. יש למחוק וליצור מחדש
+  ride_has_match_notify_other: '141', // הנסיעה שובצה! עליך ליידע את הצד השני
+  match_will_be_cancelled: '142', // השיבוץ יבוטל ויפתח מחדש לאחרים
+  press_1_yes_delete_2_cancel: '143', // לחץ 1 למחיקה, 2 לביטול
+  ride_with_match_deleted: '144', // נסיעה משובצת נמחקה בהצלחה
+  direction_from: '145', // מהישוב
+  direction_to: '146', // לישוב
+  on_date: '147', // בתאריך
+  departure_at: '148', // יציאה בשעה
+  time_window: '149', // בין השעות
 
   // Small building blocks
   the_time_is: '200',

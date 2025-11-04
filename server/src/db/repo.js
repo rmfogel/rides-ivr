@@ -112,6 +112,12 @@ export async function getMatchesByRequestId(requestId) {
   return (await matches.find({ request_id: rid }).toArray()).map(normalize);
 }
 
+export async function getMatchesByOfferId(offerId) {
+  const { matches } = await collections();
+  const oid_offer = oid(offerId);
+  return (await matches.find({ offer_id: oid_offer }).toArray()).map(normalize);
+}
+
 export async function listPendingMatchesForPhone(phone) {
   const { matches, requests } = await collections();
   const reqIds = await requests.find({ rider_phone: phone, status: { $in: ['open','partial','matched'] } }, { projection: { _id: 1 } }).toArray();
