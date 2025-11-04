@@ -2191,7 +2191,7 @@ voiceRouter.post('/ringback-hear-phone', async (req, res) => {
 // Management redirect
 voiceRouter.post('/manage', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  twiml.redirect('/manage/menu');
+  twiml.redirect('/voice/manage/menu');
   res.type('text/xml').send(twiml.toString());
 });
 
