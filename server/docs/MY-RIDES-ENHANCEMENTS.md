@@ -124,20 +124,28 @@
 
 1. **server/src/routes/offer-ride.js**
    - הוספת import של `getRequestById`
-   - הוספת endpoint `GET /:id/matches` (שורות 650-747)
+   - הוספת endpoint `GET /:id/matches` (שורות 650-750)
+   - **תיקון**: פרמוט תאריכים ושעות לפני החזרה ללקוח
+   - **תיקון**: סינון nulls במקרה של בקשות שנמחקו
 
 2. **server/src/routes/request-ride.js**
    - הוספת import של `getOfferById`
-   - הוספת endpoint `GET /:id/matches` (שורות 840-937)
+   - הוספת endpoint `GET /:id/matches` (שורות 840-940)
+   - **תיקון**: פרמוט תאריכים ושעות לפני החזרה ללקוח
+   - **תיקון**: סינון nulls במקרה של הצעות שנמחקו
 
 3. **server/public/my-rides.html**
    - הוספת CSS למודל ולנסיעות ישנות (שורות 237-381)
+   - **תיקון**: CSS למודל matches שעבר זמנם (`.past-match`)
    - הוספת HTML של המודל (שורות 328-342)
    - הוספת פונקציות JavaScript:
-     - `isPastRide()`, `isPastRequest()`
+     - `isPastRide()`, `isPastRequest()` - **תיקון**: תמיכה בפורמט dd/MM/yyyy
      - `viewOfferMatches()`, `viewRequestMatches()`
-     - `displayMatchesModal()`, `closeMatchesModal()`
-   - עדכון `renderOffers()` ו-`renderRequests()` לכלול סימון נסיעות ישנות וכפתור שילובים
+     - `displayMatchesModal()` - **תיקון**: סימון matches שעבר זמנם
+     - `closeMatchesModal()`
+   - עדכון `renderOffers()` ו-`renderRequests()` לכלול סימון נסיעות ישנות וכפתור הקצאות
+   - **שינוי טקסטים**: "מי נוסע איתי?" / "איך אני נוסע?"
+   - **הוספת הסבר**: תיבה ירוקה במודל
 
 ## דוגמאות שימוש
 

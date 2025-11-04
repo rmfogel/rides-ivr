@@ -306,19 +306,24 @@ offerRideRouter.get('/', async (req, res) => {
     });
 
     // Format the response
-    const formattedOffers = userOffers.map(offer => ({
-      id: offer._id.toString(),
-      direction: offer.direction,
-      departureTime: DateTime.fromJSDate(offer.departure_time).setZone(TZ).toISO(),
-      departureTimeDisplay: DateTime.fromJSDate(offer.departure_time).setZone(TZ).toFormat('dd/MM/yyyy HH:mm'),
-      totalSeats: (offer.seats_male_only || 0) + (offer.seats_female_only || 0) + (offer.seats_anygender || 0),
-      maleOnlySeats: offer.seats_male_only || 0,
-      femaleOnlySeats: offer.seats_female_only || 0,
-      anygenderSeats: offer.seats_anygender || 0,
-      status: offer.status,
-      notes: offer.notes,
-      createdAt: offer.created_at
-    }));
+    const formattedOffers = userOffers.map(offer => {
+      const departureDateTime = DateTime.fromJSDate(offer.departure_time).setZone(TZ);
+      
+      return {
+        id: offer._id.toString(),
+        direction: offer.direction,
+        date: departureDateTime.toFormat('dd/MM/yyyy'),
+        departureTime: departureDateTime.toFormat('HH:mm'),
+        departureTimeDisplay: departureDateTime.toFormat('dd/MM/yyyy HH:mm'),
+        totalSeats: (offer.seats_male_only || 0) + (offer.seats_female_only || 0) + (offer.seats_anygender || 0),
+        maleOnlySeats: offer.seats_male_only || 0,
+        femaleOnlySeats: offer.seats_female_only || 0,
+        anygenderSeats: offer.seats_anygender || 0,
+        status: offer.status,
+        notes: offer.notes,
+        createdAt: offer.created_at
+      };
+    });
 
     res.json({
       success: true,
@@ -696,6 +701,16 @@ offerRideRouter.get('/:id/matches', async (req, res) => {
     const populatedMatches = await Promise.all(
       matchDocs.map(async (match) => {
         const request = await getRequestById(match.request_id.toString());
+        
+        if (!request) {
+          return null;
+        }
+        
+        // Format times for display
+        const earliestDateTime = DateTime.fromJSDate(request.earliest_time).setZone(TZ);
+        const latestDateTime = DateTime.fromJSDate(request.latest_time).setZone(TZ);
+        const preferredDateTime = request.preferred_time ? DateTime.fromJSDate(request.preferred_time).setZone(TZ) : null;
+        
         return {
           id: match._id.toString(),
           status: match.status,
@@ -704,34 +719,37 @@ offerRideRouter.get('/:id/matches', async (req, res) => {
           allocated_female: match.allocated_female || 0,
           allocated_anygender: match.allocated_anygender || 0,
           allocated_couples: match.allocated_couples || 0,
-          request: request ? {
+          request: {
             id: request.id,
             rider_phone: request.rider_phone,
             rider_name: request.rider_name,
             direction: request.direction,
-            date: request.date,
-            earliestTime: request.earliestTime,
-            latestTime: request.latestTime,
-            preferredTime: request.preferredTime,
+            date: earliestDateTime.toFormat('dd/MM/yyyy'),
+            earliestTime: earliestDateTime.toFormat('HH:mm'),
+            latestTime: latestDateTime.toFormat('HH:mm'),
+            preferredTime: preferredDateTime ? preferredDateTime.toFormat('HH:mm') : null,
             maleCount: request.maleCount,
             femaleCount: request.femaleCount,
             childrenCount: request.childrenCount,
             couplesCount: request.couplesCount,
             together: request.together,
             notes: request.notes
-          } : null
+          }
         };
       })
     );
+    
+    // Filter out null values (in case some requests were deleted)
+    const validMatches = populatedMatches.filter(m => m !== null);
 
     logger.info('Retrieved matches for offer', {
       offerId: id,
-      matchCount: populatedMatches.length
+      matchCount: validMatches.length
     });
 
     res.json({
       success: true,
-      matches: populatedMatches
+      matches: validMatches
     });
 
   } catch (error) {

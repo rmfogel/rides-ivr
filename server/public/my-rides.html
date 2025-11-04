@@ -338,6 +338,15 @@
             margin-bottom: 0;
         }
 
+        .match-item.past-match {
+            opacity: 0.6;
+            background-color: #fafafa;
+        }
+
+        .match-item.past-match .match-name {
+            color: #757575;
+        }
+
         .match-header {
             display: flex;
             justify-content: space-between;
@@ -520,12 +529,19 @@
         // Check if a ride is in the past
         function isPastRide(date, time) {
             try {
+                // Parse dd/MM/yyyy format
+                let dateStr = date;
+                if (date.includes('/')) {
+                    const [day, month, year] = date.split('/');
+                    dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                }
+                
                 // Combine date and time
-                const rideDateTime = new Date(`${date}T${time}:00+03:00`); // Israel timezone UTC+3
+                const rideDateTime = new Date(`${dateStr}T${time}:00+03:00`); // Israel timezone UTC+3
                 const now = new Date();
                 return rideDateTime < now;
             } catch (error) {
-                console.error('Error checking past ride:', error);
+                console.error('Error checking past ride:', error, { date, time });
                 return false;
             }
         }
@@ -533,11 +549,18 @@
         // Check if a request time window has passed
         function isPastRequest(date, latestTime) {
             try {
-                const rideDateTime = new Date(`${date}T${latestTime}:00+03:00`);
+                // Parse dd/MM/yyyy format
+                let dateStr = date;
+                if (date.includes('/')) {
+                    const [day, month, year] = date.split('/');
+                    dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                }
+                
+                const rideDateTime = new Date(`${dateStr}T${latestTime}:00+03:00`);
                 const now = new Date();
                 return rideDateTime < now;
             } catch (error) {
-                console.error('Error checking past request:', error);
+                console.error('Error checking past request:', error, { date, latestTime });
                 return false;
             }
         }
@@ -873,10 +896,22 @@
                         'declined': 'נדחה'
                     };
                     
+                    // Check if match is in the past
+                    let isPast = false;
+                    if (type === 'offer') {
+                        // For offers, check the request's latest time
+                        isPast = isPastRequest(matchData.date, matchData.latestTime);
+                    } else {
+                        // For requests, check the offer's departure time
+                        isPast = isPastRide(matchData.date, matchData.departureTime);
+                    }
+                    
+                    const matchItemClass = isPast ? 'match-item past-match' : 'match-item';
+                    
                     if (type === 'offer') {
                         // Showing request details for an offer
                         return `
-                            <div class="match-item">
+                            <div class="${matchItemClass}">
                                 <div class="match-header">
                                     <div class="match-name">${matchData.rider_name || 'נוסע'}</div>
                                     <div class="match-status-badge status-${match.status}">${statusMap[match.status] || match.status}</div>
@@ -917,7 +952,7 @@
                     } else {
                         // Showing offer details for a request
                         return `
-                            <div class="match-item">
+                            <div class="${matchItemClass}">
                                 <div class="match-header">
                                     <div class="match-name">${matchData.driver_name || 'נהג'}</div>
                                     <div class="match-status-badge status-${match.status}">${statusMap[match.status] || match.status}</div>

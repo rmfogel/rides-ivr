@@ -394,25 +394,32 @@ requestRideRouter.get('/', async (req, res) => {
     });
 
     // Format the response
-    const formattedRequests = userRequests.map(request => ({
-      id: request._id.toString(),
-      direction: request.direction,
-      earliestTime: DateTime.fromJSDate(request.earliest_time).setZone(TZ).toISO(),
-      latestTime: DateTime.fromJSDate(request.latest_time).setZone(TZ).toISO(),
-      preferredTime: request.preferred_time ? DateTime.fromJSDate(request.preferred_time).setZone(TZ).toISO() : null,
-      earliestTimeDisplay: DateTime.fromJSDate(request.earliest_time).setZone(TZ).toFormat('dd/MM/yyyy HH:mm'),
-      latestTimeDisplay: DateTime.fromJSDate(request.latest_time).setZone(TZ).toFormat('dd/MM/yyyy HH:mm'),
-      preferredTimeDisplay: request.preferred_time ? DateTime.fromJSDate(request.preferred_time).setZone(TZ).toFormat('HH:mm') : null,
-      totalPassengers: request.passengers_total || 0,
-      maleCount: request.passengers_male || 0,
-      femaleCount: request.passengers_female || 0,
-      childrenCount: request.children_count || 0,
-      couplesCount: request.couples_count || 0,
-      together: request.together !== false,
-      status: request.status,
-      notes: request.notes,
-      createdAt: request.created_at
-    }));
+    const formattedRequests = userRequests.map(request => {
+      const earliestDateTime = DateTime.fromJSDate(request.earliest_time).setZone(TZ);
+      const latestDateTime = DateTime.fromJSDate(request.latest_time).setZone(TZ);
+      const preferredDateTime = request.preferred_time ? DateTime.fromJSDate(request.preferred_time).setZone(TZ) : null;
+      
+      return {
+        id: request._id.toString(),
+        direction: request.direction,
+        date: earliestDateTime.toFormat('dd/MM/yyyy'),
+        earliestTime: earliestDateTime.toFormat('HH:mm'),
+        latestTime: latestDateTime.toFormat('HH:mm'),
+        preferredTime: preferredDateTime ? preferredDateTime.toFormat('HH:mm') : null,
+        earliestTimeDisplay: earliestDateTime.toFormat('dd/MM/yyyy HH:mm'),
+        latestTimeDisplay: latestDateTime.toFormat('HH:mm'),
+        preferredTimeDisplay: preferredDateTime ? preferredDateTime.toFormat('HH:mm') : null,
+        totalPassengers: request.passengers_total || 0,
+        maleCount: request.passengers_male || 0,
+        femaleCount: request.passengers_female || 0,
+        childrenCount: request.children_count || 0,
+        couplesCount: request.couples_count || 0,
+        together: request.together !== false,
+        status: request.status,
+        notes: request.notes,
+        createdAt: request.created_at
+      };
+    });
 
     res.json({
       success: true,
@@ -885,6 +892,14 @@ requestRideRouter.get('/:id/matches', async (req, res) => {
     const populatedMatches = await Promise.all(
       matchDocs.map(async (match) => {
         const offer = await getOfferById(match.offer_id.toString());
+        
+        if (!offer) {
+          return null;
+        }
+        
+        // Format time for display
+        const departureDateTime = DateTime.fromJSDate(offer.departure_time).setZone(TZ);
+        
         return {
           id: match._id.toString(),
           status: match.status,
@@ -893,31 +908,34 @@ requestRideRouter.get('/:id/matches', async (req, res) => {
           allocated_female: match.allocated_female || 0,
           allocated_anygender: match.allocated_anygender || 0,
           allocated_couples: match.allocated_couples || 0,
-          offer: offer ? {
+          offer: {
             id: offer.id,
             driver_phone: offer.driver_phone,
             driver_name: offer.driver_name,
             direction: offer.direction,
-            date: offer.date,
-            departureTime: offer.departureTime,
-            totalSeats: offer.totalSeats,
-            maleOnlySeats: offer.maleOnlySeats,
-            femaleOnlySeats: offer.femaleOnlySeats,
-            anygenderSeats: offer.anygenderSeats,
+            date: departureDateTime.toFormat('dd/MM/yyyy'),
+            departureTime: departureDateTime.toFormat('HH:mm'),
+            totalSeats: (offer.seats_male_only || 0) + (offer.seats_female_only || 0) + (offer.seats_anygender || 0),
+            maleOnlySeats: offer.seats_male_only || 0,
+            femaleOnlySeats: offer.seats_female_only || 0,
+            anygenderSeats: offer.seats_anygender || 0,
             notes: offer.notes
-          } : null
+          }
         };
       })
     );
+    
+    // Filter out null values (in case some offers were deleted)
+    const validMatches = populatedMatches.filter(m => m !== null);
 
     logger.info('Retrieved matches for request', {
       requestId: id,
-      matchCount: populatedMatches.length
+      matchCount: validMatches.length
     });
 
     res.json({
       success: true,
-      matches: populatedMatches
+      matches: validMatches
     });
 
   } catch (error) {
