@@ -38,6 +38,31 @@
             border-top-right-radius: 8px;
         }
 
+        .nav-links {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: 500;
+        }
+
         .form-title {
             color: white;
             font-size: 32px;
@@ -324,6 +349,12 @@
 <body>
     <div class="container">
         <div class="header">
+            <nav class="nav-links">
+                <a href="/" class="active">הרשמה</a>
+                <a href="/offer-ride.html">הצע נסיעה</a>
+                <a href="/request-ride.html">בקש נסיעה</a>
+                <a href="/my-rides.html">הנסיעות שלי</a>
+            </nav>
             <h1 class="form-title">הרשמה למערכת הסעות</h1>
             <p class="form-description">אנא מלא את הפרטים הבאים כדי להירשם למערכת</p>
         </div>

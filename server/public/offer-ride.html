@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>הצעת נסיעה - מערכת הסעות</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #f0ebf8;
+            color: #202124;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+        }
+
+        .header {
+            background-color: #673ab7;
+            padding: 24px 24px 12px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .nav-links {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-links a.active {
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: 500;
+        }
+
+        .form-title {
+            color: white;
+            font-size: 32px;
+            font-weight: 400;
+            margin-bottom: 8px;
+            letter-spacing: 0;
+        }
+
+        .form-description {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .form-content {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 400;
+            color: #202124;
+            margin-bottom: 8px;
+        }
+
+        .required {
+            color: #d93025;
+            margin-right: 4px;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background-color: white;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            border-color: #673ab7;
+            box-shadow: 0 1px 1px 0 rgba(103, 58, 183, 0.1), 0 1px 3px 1px rgba(103, 58, 183, 0.1);
+        }
+
+        .form-input::placeholder {
+            color: #5f6368;
+            opacity: 1;
+        }
+
+        .form-select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left 12px center;
+            background-size: 20px;
+            padding-left: 40px;
+        }
+
+        .form-helper {
+            font-size: 12px;
+            color: #5f6368;
+            margin-top: 4px;
+        }
+
+        .error-message {
+            color: #d93025;
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .form-input.error,
+        .form-select.error,
+        .form-textarea.error {
+            border-color: #d93025;
+        }
+
+        .success-message {
+            background-color: #e8f5e9;
+            color: #1e7e34;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 24px;
+            display: none;
+            border-right: 4px solid #4caf50;
+        }
+
+        .info-message {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 24px;
+            display: none;
+            border-right: 4px solid #2196f3;
+        }
+
+        .matches-container {
+            margin-top: 16px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .matches-title {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #202124;
+        }
+
+        .submit-section {
+            padding: 24px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #dadce0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .submit-button {
+            background-color: #673ab7;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            letter-spacing: 0.25px;
+        }
+
+        .submit-button:hover {
+            background-color: #5e35b1;
+            box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+        }
+
+        .submit-button:active {
+            background-color: #512da8;
+        }
+
+        .submit-button:disabled {
+            background-color: #dadce0;
+            color: #5f6368;
+            cursor: not-allowed;
+        }
+
+        .clear-button {
+            background: none;
+            border: none;
+            color: #673ab7;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .clear-button:hover {
+            background-color: rgba(103, 58, 183, 0.08);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 0;
+            }
+
+            .container {
+                border-radius: 0;
+            }
+
+            .header {
+                border-radius: 0;
+            }
+
+            .form-content {
+                padding: 16px;
+            }
+
+            .submit-section {
+                padding: 16px;
+                flex-direction: column-reverse;
+                gap: 12px;
+                align-items: stretch;
+            }
+
+            .submit-button,
+            .clear-button {
+                width: 100%;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <nav class="nav-links">
+                <a href="/">הרשמה</a>
+                <a href="/offer-ride.html" class="active">הצע נסיעה</a>
+                <a href="/request-ride.html">בקש נסיעה</a>
+                <a href="/my-rides.html">הנסיעות שלי</a>
+            </nav>
+            <h1 class="form-title">הצעת נסיעה</h1>
+            <p class="form-description">מלא את הפרטים להצעת נסיעה והמערכת תחפש התאמות עבורך</p>
+        </div>
+
+        <div class="form-content">
+            <div class="success-message" id="successMessage"></div>
+            <div class="info-message" id="infoMessage"></div>
+
+            <form id="offerForm" novalidate>
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="required">*</span>
+                        מספר טלפון
+                    </label>
+                    <input 
+                        type="tel" 
+                        class="form-input" 
+                        id="phone" 
+                        name="phone" 
+                        placeholder="0501234567"
+                        required
+                    >
+                    <div class="form-helper">מספר הטלפון שלך (10 ספרות)</div>
+                    <div class="error-message" id="phoneError">נא להזין מספר טלפון תקין</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="required">*</span>
+                        כיוון הנסיעה
+                    </label>
+                    <select class="form-select" id="direction" name="direction" required>
+                        <option value="">בחר כיוון</option>
+                        <option value="FROM">מהיישוב</option>
+                        <option value="TO">ליישוב</option>
+                    </select>
+                    <div class="error-message" id="directionError">נא לבחור כיוון נסיעה</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="required">*</span>
+                            תאריך
+                        </label>
+                        <input 
+                            type="date" 
+                            class="form-input" 
+                            id="date" 
+                            name="date" 
+                            required
+                        >
+                        <div class="error-message" id="dateError">נא לבחור תאריך</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span class="required">*</span>
+                            שעת יציאה
+                        </label>
+                        <input 
+                            type="time" 
+                            class="form-input" 
+                            id="departureTime" 
+                            name="departureTime" 
+                            required
+                        >
+                        <div class="form-helper">שעת היציאה המתוכננת</div>
+                        <div class="error-message" id="departureTimeError">נא לבחור שעת יציאה</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span class="required">*</span>
+                        סה"כ מקומות פנויים
+                    </label>
+                    <input 
+                        type="number" 
+                        class="form-input" 
+                        id="totalSeats" 
+                        name="totalSeats" 
+                        min="1" 
+                        max="9"
+                        placeholder="1-9"
+                        required
+                    >
+                    <div class="form-helper">כמה מקומות יש לך ברכב?</div>
+                    <div class="error-message" id="totalSeatsError">נא להזין מספר מקומות (1-9)</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">
+                            מקומות לגברים בלבד
+                        </label>
+                        <input 
+                            type="number" 
+                            class="form-input" 
+                            id="maleOnlySeats" 
+                            name="maleOnlySeats" 
+                            min="0" 
+                            max="9"
+                            value="0"
+                        >
+                        <div class="form-helper">אופציונלי</div>
+                        <div class="error-message" id="maleOnlySeatsError"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            מקומות לנשים בלבד
+                        </label>
+                        <input 
+                            type="number" 
+                            class="form-input" 
+                            id="femaleOnlySeats" 
+                            name="femaleOnlySeats" 
+                            min="0" 
+                            max="9"
+                            value="0"
+                        >
+                        <div class="form-helper">אופציונלי</div>
+                        <div class="error-message" id="femaleOnlySeatsError"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        הערות
+                    </label>
+                    <textarea 
+                        class="form-textarea" 
+                        id="notes" 
+                        name="notes" 
+                        rows="3"
+                        placeholder="הערות נוספות (אופציונלי)"
+                    ></textarea>
+                </div>
+            </form>
+        </div>
+
+        <div class="submit-section">
+            <button type="button" class="clear-button" id="clearButton">נקה טופס</button>
+            <button type="submit" class="submit-button" id="submitButton">שלח הצעה</button>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('offerForm');
+        const submitButton = document.getElementById('submitButton');
+        const clearButton = document.getElementById('clearButton');
+        const successMessage = document.getElementById('successMessage');
+        const infoMessage = document.getElementById('infoMessage');
+
+        // Set minimum date to today
+        const dateInput = document.getElementById('date');
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.min = today;
+        dateInput.value = today;
+
+        // Phone validation
+        function validatePhone(phone) {
+            const phoneRegex = /^0\d{9}$/;
+            return phoneRegex.test(phone.replace(/\s/g, ''));
+        }
+
+        // Clear error
+        function clearError(fieldId) {
+            const field = document.getElementById(fieldId);
+            const errorElement = document.getElementById(fieldId + 'Error');
+            field.classList.remove('error');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+        }
+
+        // Show error
+        function showError(fieldId, message) {
+            const field = document.getElementById(fieldId);
+            const errorElement = document.getElementById(fieldId + 'Error');
+            field.classList.add('error');
+            if (errorElement) {
+                if (message) errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+        }
+
+        // Add input listeners to clear errors
+        ['phone', 'direction', 'date', 'departureTime', 'totalSeats', 'maleOnlySeats', 'femaleOnlySeats'].forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener('input', () => clearError(fieldId));
+                field.addEventListener('focus', () => clearError(fieldId));
+            }
+        });
+
+        // Validate seat allocation
+        function validateSeats() {
+            const total = parseInt(document.getElementById('totalSeats').value) || 0;
+            const maleOnly = parseInt(document.getElementById('maleOnlySeats').value) || 0;
+            const femaleOnly = parseInt(document.getElementById('femaleOnlySeats').value) || 0;
+
+            if (maleOnly + femaleOnly > total) {
+                showError('maleOnlySeats', 'סכום המקומות המיועדים לא יכול לעלות על סה"כ המקומות');
+                showError('femaleOnlySeats', 'סכום המקומות המיועדים לא יכול לעלות על סה"כ המקומות');
+                return false;
+            }
+
+            clearError('maleOnlySeats');
+            clearError('femaleOnlySeats');
+            return true;
+        }
+
+        // Update validation on seat inputs
+        document.getElementById('totalSeats').addEventListener('input', validateSeats);
+        document.getElementById('maleOnlySeats').addEventListener('input', validateSeats);
+        document.getElementById('femaleOnlySeats').addEventListener('input', validateSeats);
+
+        // Form validation
+        function validateForm() {
+            let isValid = true;
+
+            // Phone
+            const phone = document.getElementById('phone').value.trim();
+            if (!phone || !validatePhone(phone)) {
+                showError('phone', 'נא להזין מספר טלפון תקין (10 ספרות)');
+                isValid = false;
+            }
+
+            // Direction
+            const direction = document.getElementById('direction').value;
+            if (!direction) {
+                showError('direction', 'נא לבחור כיוון נסיעה');
+                isValid = false;
+            }
+
+            // Date
+            const date = document.getElementById('date').value;
+            if (!date) {
+                showError('date', 'נא לבחור תאריך');
+                isValid = false;
+            } else {
+                const selectedDate = new Date(date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (selectedDate < today) {
+                    showError('date', 'התאריך לא יכול להיות בעבר');
+                    isValid = false;
+                }
+            }
+
+            // Time
+            const time = document.getElementById('departureTime').value;
+            if (!time) {
+                showError('departureTime', 'נא לבחור שעת יציאה');
+                isValid = false;
+            }
+
+            // Total seats
+            const totalSeats = parseInt(document.getElementById('totalSeats').value);
+            if (!totalSeats || totalSeats < 1 || totalSeats > 9) {
+                showError('totalSeats', 'נא להזין מספר מקומות בין 1 ל-9');
+                isValid = false;
+            }
+
+            // Validate seat allocation
+            if (!validateSeats()) {
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        // Submit handler
+        submitButton.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            if (!validateForm()) {
+                return;
+            }
+
+            // Prepare form data
+            const formData = {
+                phone: document.getElementById('phone').value.trim(),
+                direction: document.getElementById('direction').value,
+                date: document.getElementById('date').value,
+                departureTime: document.getElementById('departureTime').value,
+                totalSeats: parseInt(document.getElementById('totalSeats').value),
+                maleOnlySeats: parseInt(document.getElementById('maleOnlySeats').value) || 0,
+                femaleOnlySeats: parseInt(document.getElementById('femaleOnlySeats').value) || 0,
+                notes: document.getElementById('notes').value.trim() || null
+            };
+
+            // Disable button during submission
+            submitButton.disabled = true;
+            submitButton.textContent = 'שולח...';
+            successMessage.style.display = 'none';
+            infoMessage.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/rides/offer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Show success message
+                    successMessage.innerHTML = `
+                        <strong>ההצעה נשלחה בהצלחה!</strong><br>
+                        ${data.message}
+                        ${data.matchCount > 0 ? `<br><br>נמצאו ${data.matchCount} התאמות אפשריות. נציג יצור איתך קשר בקרוב.` : ''}
+                    `;
+                    successMessage.style.display = 'block';
+                    form.reset();
+                    dateInput.value = today;
+                    
+                    // Scroll to success message
+                    successMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Optionally redirect to my-rides after a delay
+                    setTimeout(() => {
+                        if (confirm('האם תרצה לראות את ההצעות שלך?')) {
+                            window.location.href = `/my-rides.html?phone=${encodeURIComponent(formData.phone)}`;
+                        }
+                    }, 2000);
+                } else {
+                    alert('שגיאה: ' + (data.error || 'שגיאה לא ידועה'));
+                }
+            } catch (error) {
+                console.error('Error submitting offer:', error);
+                alert('אירעה שגיאה בשליחת ההצעה. אנא נסה שוב.');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'שלח הצעה';
+            }
+        });
+
+        // Clear form handler
+        clearButton.addEventListener('click', () => {
+            if (confirm('האם אתה בטוח שברצונך לנקות את הטופס?')) {
+                form.reset();
+                dateInput.value = today;
+                successMessage.style.display = 'none';
+                infoMessage.style.display = 'none';
+                
+                // Clear all errors
+                ['phone', 'direction', 'date', 'departureTime', 'totalSeats', 'maleOnlySeats', 'femaleOnlySeats'].forEach(clearError);
+            }
+        });
+
+        // Load phone from URL if provided
+        const urlParams = new URLSearchParams(window.location.search);
+        const phoneParam = urlParams.get('phone');
+        if (phoneParam) {
+            document.getElementById('phone').value = phoneParam;
+        }
+    </script>
+</body>
+</html>

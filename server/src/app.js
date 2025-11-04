@@ -10,6 +10,8 @@ import { voiceRouter } from './routes/voice.js';
 import { manageRouter } from './routes/manage.js';
 import { duplicateRouter } from './routes/duplicate.js';
 import { registerRouter } from './routes/register.js';
+import { offerRideRouter } from './routes/offer-ride.js';
+import { requestRideRouter } from './routes/request-ride.js';
 import { collections, getDb } from './db/mongoClient.js';
 import * as logger from './utils/logger.js';
 
@@ -65,12 +67,17 @@ app.use('/voice', voiceRouter);
 app.use('/voice/manage', manageRouter);
 app.use('/voice/manage/duplicate', duplicateRouter);
 app.use('/api/register', registerRouter);
+app.use('/api/rides/offer', offerRideRouter);
+app.use('/api/rides/request', requestRideRouter);
 
 // Serve static files (recorded prompts) from /public under /static
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, '..', 'public');
 app.use('/static', express.static(publicDir));
+
+// Serve all static HTML files from public directory
+app.use(express.static(publicDir));
 
 // Serve registration form as home page
 app.get('/', (req, res) => {
