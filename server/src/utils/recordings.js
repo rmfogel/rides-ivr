@@ -117,6 +117,18 @@ export const PROMPT_IDS = {
   including: '210',
   children: '211',
 
+  // IVR Registration flow (NEW)
+  registration_welcome: '250', // שלום! מספר זה לא רשום במערכת
+  registration_record_name: '251', // אנא הקלט את שמך המלא לאחר הצפצוף
+  registration_name_recorded: '252', // תודה! השם נקלט בהצלחה
+  registration_choose_pin: '253', // כעת בחר סיסמה בת 4 ספרות לממשק האינטרנט
+  registration_confirm_pin: '254', // אנא הזן שוב את הסיסמה לאישור
+  registration_pin_mismatch: '255', // הסיסמאות אינן תואמות. ננסה שוב
+  registration_pin_invalid: '256', // סיסמה לא תקינה. יש להזין 4 ספרות בלבד
+  registration_complete: '257', // ההרשמה הושלמה בהצלחה! כעת תועבר לתפריט הראשי
+  reset_pin_intro: '258', // איפוס סיסמה. הזן סיסמה חדשה בת 4 ספרות
+  reset_pin_success: '259', // הסיסמה אופסה בהצלחה
+
   // Digits and symbols
   digit_0: '3000',
   digit_1: '3001',

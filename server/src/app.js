@@ -12,6 +12,7 @@ import { duplicateRouter } from './routes/duplicate.js';
 import { registerRouter } from './routes/register.js';
 import { offerRideRouter } from './routes/offer-ride.js';
 import { requestRideRouter } from './routes/request-ride.js';
+import authRouter from './routes/auth.js';
 import { collections, getDb } from './db/mongoClient.js';
 import * as logger from './utils/logger.js';
 
@@ -66,7 +67,8 @@ app.use('/health', healthRouter);
 app.use('/voice', voiceRouter);
 app.use('/voice/manage', manageRouter);
 app.use('/voice/manage/duplicate', duplicateRouter);
-app.use('/api/register', registerRouter);
+app.use('/api/auth', authRouter);
+// app.use('/api/register', registerRouter);  // Disabled: Registration now via IVR only
 app.use('/api/rides/offer', offerRideRouter);
 app.use('/api/rides/request', requestRideRouter);
 
@@ -79,9 +81,9 @@ app.use('/static', express.static(publicDir));
 // Serve all static HTML files from public directory
 app.use(express.static(publicDir));
 
-// Serve registration form as home page
+// Serve login form as home page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(publicDir, 'register.html'));
+  res.sendFile(path.join(publicDir, 'login.html'));
 });
 
 app.use((err, req, res, next) => {

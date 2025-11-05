@@ -386,3 +386,182 @@ function normalize(doc) {
   }
   return doc;
 }
+
+/**
+ * Check if a user exists by phone number
+ * @param {string} phone - Phone number to check
+ * @returns {Promise<boolean>} True if user exists
+ */
+export async function checkUserExists(phone) {
+  const { users } = await collections();
+  logger.debug('Checking if user exists', { phone });
+  
+  try {
+    const user = await users.findOne({ phone });
+    const exists = user !== null;
+    logger.debug('User existence check result', { phone, exists });
+    return exists;
+  } catch (err) {
+    logger.error('Failed to check user existence', {
+      phone,
+      error: err.message,
+      stack: err.stack
+    });
+    throw err;
+  }
+}
+
+/**
+ * Save name recording URL for a user
+ * @param {string} phone - Phone number
+ * @param {string} recordingUrl - URL to Twilio recording
+ * @returns {Promise<Object>} Updated user document
+ */
+export async function saveNameRecording(phone, recordingUrl) {
+  const { users } = await collections();
+  logger.debug('Saving name recording', { phone, hasUrl: !!recordingUrl });
+  
+  try {
+    const res = await users.findOneAndUpdate(
+      { phone },
+      { 
+        $set: { 
+          name_recording_url: recordingUrl,
+          updated_at: new Date() 
+        },
+        $setOnInsert: { 
+          created_at: new Date(),
+          is_allowed: true
+        }
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    
+    const doc = normalize(res.value || res);
+    logger.info('Name recording saved successfully', { 
+      userId: doc.id, 
+      phone 
+    });
+    return doc;
+  } catch (err) {
+    logger.error('Failed to save name recording', {
+      phone,
+      error: err.message,
+      stack: err.stack
+    });
+    throw err;
+  }
+}
+
+/**
+ * Save or update PIN for a user (PIN should be pre-hashed)
+ * @param {string} phone - Phone number
+ * @param {string} hashedPin - Hashed 4-digit PIN
+ * @returns {Promise<Object>} Updated user document
+ */
+export async function savePIN(phone, hashedPin) {
+  const { users } = await collections();
+  logger.debug('Saving PIN', { phone });
+  
+  try {
+    const res = await users.findOneAndUpdate(
+      { phone },
+      { 
+        $set: { 
+          pin: hashedPin,
+          registered_via_ivr: true,
+          updated_at: new Date() 
+        },
+        $setOnInsert: { 
+          created_at: new Date(),
+          is_allowed: true
+        }
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    
+    const doc = normalize(res.value || res);
+    logger.info('PIN saved successfully', { 
+      userId: doc.id, 
+      phone,
+      registered: doc.registered_via_ivr
+    });
+    return doc;
+  } catch (err) {
+    logger.error('Failed to save PIN', {
+      phone,
+      error: err.message,
+      stack: err.stack
+    });
+    throw err;
+  }
+}
+
+/**
+ * Update PIN for existing user (PIN should be pre-hashed)
+ * @param {string} phone - Phone number
+ * @param {string} hashedPin - New hashed 4-digit PIN
+ * @returns {Promise<Object|null>} Updated user document or null if user not found
+ */
+export async function updatePIN(phone, hashedPin) {
+  const { users } = await collections();
+  logger.debug('Updating PIN', { phone });
+  
+  try {
+    const res = await users.findOneAndUpdate(
+      { phone },
+      { 
+        $set: { 
+          pin: hashedPin,
+          updated_at: new Date() 
+        }
+      },
+      { returnDocument: 'after' }
+    );
+    
+    if (!res.value && !res) {
+      logger.warn('Cannot update PIN - user not found', { phone });
+      return null;
+    }
+    
+    const doc = normalize(res.value || res);
+    logger.info('PIN updated successfully', { 
+      userId: doc.id, 
+      phone
+    });
+    return doc;
+  } catch (err) {
+    logger.error('Failed to update PIN', {
+      phone,
+      error: err.message,
+      stack: err.stack
+    });
+    throw err;
+  }
+}
+
+/**
+ * Get user's stored hashed PIN for verification
+ * @param {string} phone - Phone number
+ * @returns {Promise<string|null>} Hashed PIN or null if not set
+ */
+export async function getUserPIN(phone) {
+  const { users } = await collections();
+  logger.debug('Getting user PIN', { phone });
+  
+  try {
+    const user = await users.findOne({ phone }, { projection: { pin: 1 } });
+    if (!user) {
+      logger.debug('User not found when getting PIN', { phone });
+      return null;
+    }
+    return user.pin || null;
+  } catch (err) {
+    logger.error('Failed to get user PIN', {
+      phone,
+      error: err.message,
+      stack: err.stack
+    });
+    throw err;
+  }
+}

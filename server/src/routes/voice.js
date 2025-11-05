@@ -12,12 +12,18 @@ import {
   getUserByPhone, 
   updateMatchStatus,
   listPendingMatchesForPhone,
-  listPendingMatchesForDriverPhone
+  listPendingMatchesForDriverPhone,
+  checkUserExists,
+  saveNameRecording,
+  savePIN,
+  updatePIN,
+  getUserPIN
 } from '../db/repo.js';
 import { matchNewOffer, matchNewRequest } from '../engine/matching.js';
 import { DateTime } from 'luxon';
 import { TZ } from '../utils/time.js';
 import { playPrompt, playDigits, playHHMM } from '../utils/recordings.js';
+import { hashPIN, verifyPIN, isValidPINFormat } from '../utils/pin.js';
 import logger from '../utils/logger.js';
 import { DEFAULT_LANGUAGE } from '../config/language.js';
 
@@ -42,9 +48,9 @@ function normalizeIsraeliPhone(phone) {
 }
 
 /**
- * Play user's full name using English TTS (works better for Hebrew names)
+ * Play user's full name - use recorded name if available, otherwise fallback to TTS
  * @param {object} twimlNode - The TwiML node to add the name playback to
- * @param {object} user - User object with fullName or name property
+ * @param {object} user - User object with name_recording_url, fullName or name property
  * @param {string} role - 'driver' or 'rider' for logging purposes
  */
 function playFullName(twimlNode, user, role = 'user') {
@@ -53,23 +59,38 @@ function playFullName(twimlNode, user, role = 'user') {
     return;
   }
   
-  const fullName = user.fullName || user.name;
-  
-  if (!fullName || fullName.trim() === '') {
-    logger.debug(`No name found for ${role}, skipping name playback`, { userId: user.id });
-    return;
-  }
-  
   try {
+    // Priority 1: Use recorded name if available
+    if (user.name_recording_url) {
+      logger.debug(`Playing recorded name for ${role}`, { 
+        userId: user.id, 
+        recordingUrl: user.name_recording_url 
+      });
+      twimlNode.play(user.name_recording_url);
+      return;
+    }
+    
+    // Priority 2: Fallback to TTS with text name
+    const fullName = user.fullName || user.name;
+    
+    if (!fullName || fullName.trim() === '') {
+      logger.debug(`No name found for ${role}, skipping name playback`, { userId: user.id });
+      return;
+    }
+    
     // Use Polly Joanna (English female voice) - works better for reading Hebrew names
     twimlNode.say({ 
       voice: 'Polly.Joanna',
       language: 'en-US'
     }, fullName);
     
-    logger.debug(`Playing full name for ${role}`, { name: fullName, userId: user.id });
+    logger.debug(`Playing TTS name for ${role}`, { name: fullName, userId: user.id });
   } catch (error) {
-    logger.error(`Error playing name for ${role}`, { error: error.message, name: fullName });
+    logger.error(`Error playing name for ${role}`, { 
+      error: error.message, 
+      hasRecording: !!user.name_recording_url,
+      name: user.fullName || user.name 
+    });
   }
 }
 
@@ -88,8 +109,8 @@ voiceRouter.use((req, res, next) => {
 
 // Entry point for calls
 voiceRouter.post('/incoming', async (req, res) => {
-  const phone = req.body.From;
-  // Set session language based on query param if provided, default to English
+  const phone = normalizeIsraeliPhone(req.body.From);
+  // Set session language based on query param if provided, default to Hebrew
   const language = req.query.lang || DEFAULT_LANGUAGE;
   
   // Store language preference in session for future requests
@@ -97,6 +118,7 @@ voiceRouter.post('/incoming', async (req, res) => {
     req.session = {};
   }
   req.session.language = language;
+  req.session.phone = phone;
   
   logger.info('Incoming call received', {
     from: phone,
@@ -105,21 +127,52 @@ voiceRouter.post('/incoming', async (req, res) => {
     language
   });
   
-  const twiml = new twilio.twiml.VoiceResponse();
-  
-  // Use recorded audio for Hebrew
-  playPrompt(twiml, 'welcome');
-  
-  const gather = twiml.gather({
-    input: 'dtmf',
-    numDigits: 1,
-    timeout: 6,
-    action: `/voice/menu?lang=${language}`
-  });
-  playPrompt(gather, 'main_menu');
-  playPrompt(twiml, 'no_input_goodbye');
-  twiml.hangup();
-  res.type('text/xml').send(twiml.toString());
+  try {
+    // Check if user exists and is registered via IVR
+    const userExists = await checkUserExists(phone);
+    const user = userExists ? await getUserByPhone(phone) : null;
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // If user doesn't exist or hasn't completed IVR registration, redirect to registration
+    if (!userExists || !user || !user.registered_via_ivr) {
+      logger.info('New user or incomplete registration, redirecting to registration', {
+        phone,
+        userExists,
+        hasUser: !!user,
+        registeredViaIVR: user?.registered_via_ivr
+      });
+      
+      twiml.redirect(`/voice/register/welcome?lang=${language}`);
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    // User is registered, proceed to main menu
+    playPrompt(twiml, 'welcome');
+    
+    const gather = twiml.gather({
+      input: 'dtmf',
+      numDigits: 1,
+      timeout: 6,
+      action: `/voice/menu?lang=${language}`
+    });
+    playPrompt(gather, 'main_menu');
+    playPrompt(twiml, 'no_input_goodbye');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+  } catch (err) {
+    logger.error('Error in incoming call handler', {
+      error: err.message,
+      stack: err.stack,
+      phone
+    });
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+  }
 });
 
 // Main menu handler
@@ -141,6 +194,9 @@ voiceRouter.post('/menu', (req, res) => {
     twiml.redirect(`/voice/rider?lang=${language}`);
   } else if (Digits === '3') {
     twiml.redirect(`/voice/manage?lang=${language}`);
+  } else if (Digits === '4') {
+    // Reset PIN option
+    twiml.redirect(`/voice/register/reset-pin?lang=${language}`);
   } else {
     playPrompt(twiml, 'invalid_input');
     twiml.hangup();
@@ -2192,6 +2248,352 @@ voiceRouter.post('/ringback-hear-phone', async (req, res) => {
 voiceRouter.post('/manage', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   twiml.redirect('/voice/manage/menu');
+  res.type('text/xml').send(twiml.toString());
+});
+
+// ==================== REGISTRATION FLOW ====================
+
+// Registration welcome - inform user they need to register
+voiceRouter.post('/register/welcome', (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  logger.info('Registration welcome', {
+    phone: req.session?.phone
+  });
+  
+  // Welcome message for new user
+  playPrompt(twiml, 'registration_welcome');
+  
+  // Redirect to name recording
+  twiml.redirect(`/voice/register/record-name?lang=${language}`);
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Record user's name
+voiceRouter.post('/register/record-name', (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  logger.info('Recording name prompt', {
+    phone: req.session?.phone
+  });
+  
+  // Prompt user to record their name
+  playPrompt(twiml, 'registration_record_name');
+  
+  // Record the name (max 5 seconds, finish on #)
+  twiml.record({
+    maxLength: 5,
+    finishOnKey: '#',
+    action: `/voice/register/save-name?lang=${language}`,
+    recordingStatusCallback: `/voice/register/recording-status`,
+    timeout: 3,
+    transcribe: false
+  });
+  
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Save the recorded name
+voiceRouter.post('/register/save-name', async (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const phone = req.session?.phone;
+  const recordingUrl = req.body.RecordingUrl;
+  
+  logger.info('Saving recorded name', {
+    phone,
+    recordingUrl,
+    hasRecording: !!recordingUrl
+  });
+  
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  try {
+    if (!phone) {
+      logger.error('No phone in session for name recording');
+      playPrompt(twiml, 'error_generic_try_later');
+      twiml.hangup();
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    // Save recording URL to database
+    if (recordingUrl) {
+      await saveNameRecording(phone, recordingUrl);
+      logger.info('Name recording saved', { phone, recordingUrl });
+      
+      // Confirm and proceed to PIN selection
+      playPrompt(twiml, 'registration_name_recorded');
+      twiml.redirect(`/voice/register/choose-pin?lang=${language}`);
+    } else {
+      // No recording captured, try again
+      logger.warn('No recording URL received');
+      playPrompt(twiml, 'error_generic_try_later');
+      twiml.redirect(`/voice/register/record-name?lang=${language}`);
+    }
+  } catch (err) {
+    logger.error('Error saving name recording', {
+      error: err.message,
+      stack: err.stack,
+      phone
+    });
+    playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
+  }
+  
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Recording status callback (for logging)
+voiceRouter.post('/register/recording-status', (req, res) => {
+  logger.info('Recording status callback', {
+    recordingSid: req.body.RecordingSid,
+    recordingUrl: req.body.RecordingUrl,
+    recordingStatus: req.body.RecordingStatus,
+    recordingDuration: req.body.RecordingDuration
+  });
+  res.sendStatus(200);
+});
+
+// Choose PIN - prompt user to enter 4-digit PIN
+voiceRouter.post('/register/choose-pin', (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  logger.info('PIN selection prompt', {
+    phone: req.session?.phone
+  });
+  
+  playPrompt(twiml, 'registration_choose_pin');
+  
+  const gather = twiml.gather({
+    input: 'dtmf',
+    numDigits: 4,
+    timeout: 10,
+    action: `/voice/register/confirm-pin?lang=${language}`
+  });
+  
+  playPrompt(twiml, 'error_generic_try_later');
+  twiml.hangup();
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Confirm PIN - ask user to enter PIN again
+voiceRouter.post('/register/confirm-pin', (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const { Digits } = req.body;
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  logger.info('PIN confirmation prompt', {
+    phone: req.session?.phone,
+    pinLength: Digits?.length
+  });
+  
+  // Validate PIN format
+  if (!isValidPINFormat(Digits)) {
+    logger.warn('Invalid PIN format', { pin: Digits });
+    playPrompt(twiml, 'registration_pin_invalid');
+    twiml.redirect(`/voice/register/choose-pin?lang=${language}`);
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
+  // Store PIN temporarily in session
+  req.session.tempPIN = Digits;
+  
+  // Ask for confirmation
+  playPrompt(twiml, 'registration_confirm_pin');
+  
+  const gather = twiml.gather({
+    input: 'dtmf',
+    numDigits: 4,
+    timeout: 10,
+    action: `/voice/register/save-pin?lang=${language}`
+  });
+  
+  playPrompt(twiml, 'error_generic_try_later');
+  twiml.hangup();
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Save PIN - verify match and save to database
+voiceRouter.post('/register/save-pin', async (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const { Digits } = req.body;
+  const phone = req.session?.phone;
+  const tempPIN = req.session?.tempPIN;
+  
+  logger.info('Saving PIN', {
+    phone,
+    pinMatch: Digits === tempPIN,
+    hasTemp: !!tempPIN
+  });
+  
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  try {
+    if (!phone || !tempPIN) {
+      logger.error('Missing phone or temp PIN in session');
+      playPrompt(twiml, 'error_generic_try_later');
+      twiml.hangup();
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    // Check if PINs match
+    if (Digits !== tempPIN) {
+      logger.warn('PIN mismatch', { phone });
+      playPrompt(twiml, 'registration_pin_mismatch');
+      delete req.session.tempPIN;
+      twiml.redirect(`/voice/register/choose-pin?lang=${language}`);
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    // Hash and save PIN
+    const hashedPIN = await hashPIN(Digits);
+    await savePIN(phone, hashedPIN);
+    
+    logger.info('Registration completed successfully', { phone });
+    
+    // Clean up session
+    delete req.session.tempPIN;
+    
+    // Confirm completion and redirect to main menu
+    playPrompt(twiml, 'registration_complete');
+    twiml.redirect(`/voice/incoming?lang=${language}`);
+    
+  } catch (err) {
+    logger.error('Error saving PIN', {
+      error: err.message,
+      stack: err.stack,
+      phone
+    });
+    playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
+  }
+  
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Reset PIN flow - for existing users (option 4 from main menu)
+voiceRouter.post('/register/reset-pin', (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  logger.info('PIN reset initiated', {
+    phone: req.session?.phone
+  });
+  
+  playPrompt(twiml, 'reset_pin_intro');
+  
+  const gather = twiml.gather({
+    input: 'dtmf',
+    numDigits: 4,
+    timeout: 10,
+    action: `/voice/register/reset-pin-confirm?lang=${language}`
+  });
+  
+  playPrompt(twiml, 'error_generic_try_later');
+  twiml.hangup();
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Confirm new PIN during reset
+voiceRouter.post('/register/reset-pin-confirm', (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const { Digits } = req.body;
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  logger.info('PIN reset confirmation', {
+    phone: req.session?.phone,
+    pinLength: Digits?.length
+  });
+  
+  // Validate PIN format
+  if (!isValidPINFormat(Digits)) {
+    logger.warn('Invalid PIN format during reset', { pin: Digits });
+    playPrompt(twiml, 'registration_pin_invalid');
+    twiml.redirect(`/voice/register/reset-pin?lang=${language}`);
+    res.type('text/xml').send(twiml.toString());
+    return;
+  }
+  
+  // Store PIN temporarily in session
+  req.session.tempPIN = Digits;
+  
+  // Ask for confirmation
+  playPrompt(twiml, 'registration_confirm_pin');
+  
+  const gather = twiml.gather({
+    input: 'dtmf',
+    numDigits: 4,
+    timeout: 10,
+    action: `/voice/register/reset-pin-save?lang=${language}`
+  });
+  
+  playPrompt(twiml, 'error_generic_try_later');
+  twiml.hangup();
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Save new PIN during reset
+voiceRouter.post('/register/reset-pin-save', async (req, res) => {
+  const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
+  const { Digits } = req.body;
+  const phone = req.session?.phone;
+  const tempPIN = req.session?.tempPIN;
+  
+  logger.info('Saving reset PIN', {
+    phone,
+    pinMatch: Digits === tempPIN
+  });
+  
+  const twiml = new twilio.twiml.VoiceResponse();
+  
+  try {
+    if (!phone || !tempPIN) {
+      logger.error('Missing phone or temp PIN in reset session');
+      playPrompt(twiml, 'error_generic_try_later');
+      twiml.hangup();
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    // Check if PINs match
+    if (Digits !== tempPIN) {
+      logger.warn('PIN mismatch during reset', { phone });
+      playPrompt(twiml, 'registration_pin_mismatch');
+      delete req.session.tempPIN;
+      twiml.redirect(`/voice/register/reset-pin?lang=${language}`);
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    // Hash and update PIN
+    const hashedPIN = await hashPIN(Digits);
+    await updatePIN(phone, hashedPIN);
+    
+    logger.info('PIN reset completed successfully', { phone });
+    
+    // Clean up session
+    delete req.session.tempPIN;
+    
+    // Confirm success and return to main menu
+    playPrompt(twiml, 'reset_pin_success');
+    twiml.redirect(`/voice/incoming?lang=${language}`);
+    
+  } catch (err) {
+    logger.error('Error resetting PIN', {
+      error: err.message,
+      stack: err.stack,
+      phone
+    });
+    playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
+  }
+  
   res.type('text/xml').send(twiml.toString());
 });
 
