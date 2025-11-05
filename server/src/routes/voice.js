@@ -2401,7 +2401,7 @@ voiceRouter.post('/register/confirm-pin', (req, res) => {
     return;
   }
   
-  // Store PIN temporarily in session
+  // Store PIN temporarily in session AND pass it as query param for reliability
   req.session.tempPIN = Digits;
   
   // Ask for confirmation
@@ -2411,7 +2411,7 @@ voiceRouter.post('/register/confirm-pin', (req, res) => {
     input: 'dtmf',
     numDigits: 4,
     timeout: 10,
-    action: `/voice/register/save-pin?lang=${language}`
+    action: `/voice/register/save-pin?lang=${language}&temp=${Digits}`
   });
   
   playPrompt(twiml, 'error_generic_try_later');
@@ -2424,14 +2424,15 @@ voiceRouter.post('/register/save-pin', async (req, res) => {
   const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
   const { Digits } = req.body;
   const phone = req.session?.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
-  const tempPIN = req.session?.tempPIN;
+  const tempPIN = req.query.temp || req.session?.tempPIN;  // Try query param first, then session
   
   logger.info('Saving PIN', {
     phone,
     pinMatch: Digits === tempPIN,
     hasTemp: !!tempPIN,
     fromSession: !!req.session?.phone,
-    fromBody: !!req.body.From
+    fromBody: !!req.body.From,
+    fromQuery: !!req.query.temp
   });
   
   const twiml = new twilio.twiml.VoiceResponse();
@@ -2524,7 +2525,7 @@ voiceRouter.post('/register/reset-pin-confirm', (req, res) => {
     return;
   }
   
-  // Store PIN temporarily in session
+  // Store PIN temporarily in session AND pass it as query param for reliability
   req.session.tempPIN = Digits;
   
   // Ask for confirmation
@@ -2534,7 +2535,7 @@ voiceRouter.post('/register/reset-pin-confirm', (req, res) => {
     input: 'dtmf',
     numDigits: 4,
     timeout: 10,
-    action: `/voice/register/reset-pin-save?lang=${language}`
+    action: `/voice/register/reset-pin-save?lang=${language}&temp=${Digits}`
   });
   
   playPrompt(twiml, 'error_generic_try_later');
@@ -2547,13 +2548,14 @@ voiceRouter.post('/register/reset-pin-save', async (req, res) => {
   const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
   const { Digits } = req.body;
   const phone = req.session?.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
-  const tempPIN = req.session?.tempPIN;
+  const tempPIN = req.query.temp || req.session?.tempPIN;  // Try query param first, then session
   
   logger.info('Saving reset PIN', {
     phone,
     pinMatch: Digits === tempPIN,
     fromSession: !!req.session?.phone,
-    fromBody: !!req.body.From
+    fromBody: !!req.body.From,
+    fromQuery: !!req.query.temp
   });
   
   const twiml = new twilio.twiml.VoiceResponse();
