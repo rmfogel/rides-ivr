@@ -2298,20 +2298,22 @@ voiceRouter.post('/register/record-name', (req, res) => {
 // Save the recorded name
 voiceRouter.post('/register/save-name', async (req, res) => {
   const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
-  const phone = req.session?.phone;
+  const phone = req.session?.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   const recordingUrl = req.body.RecordingUrl;
   
   logger.info('Saving recorded name', {
     phone,
     recordingUrl,
-    hasRecording: !!recordingUrl
+    hasRecording: !!recordingUrl,
+    fromSession: !!req.session?.phone,
+    fromBody: !!req.body.From
   });
   
   const twiml = new twilio.twiml.VoiceResponse();
   
   try {
     if (!phone) {
-      logger.error('No phone in session for name recording');
+      logger.error('No phone in session or request body for name recording');
       playPrompt(twiml, 'error_generic_try_later');
       twiml.hangup();
       res.type('text/xml').send(twiml.toString());
@@ -2421,13 +2423,15 @@ voiceRouter.post('/register/confirm-pin', (req, res) => {
 voiceRouter.post('/register/save-pin', async (req, res) => {
   const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
   const { Digits } = req.body;
-  const phone = req.session?.phone;
+  const phone = req.session?.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   const tempPIN = req.session?.tempPIN;
   
   logger.info('Saving PIN', {
     phone,
     pinMatch: Digits === tempPIN,
-    hasTemp: !!tempPIN
+    hasTemp: !!tempPIN,
+    fromSession: !!req.session?.phone,
+    fromBody: !!req.body.From
   });
   
   const twiml = new twilio.twiml.VoiceResponse();
@@ -2542,12 +2546,14 @@ voiceRouter.post('/register/reset-pin-confirm', (req, res) => {
 voiceRouter.post('/register/reset-pin-save', async (req, res) => {
   const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
   const { Digits } = req.body;
-  const phone = req.session?.phone;
+  const phone = req.session?.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   const tempPIN = req.session?.tempPIN;
   
   logger.info('Saving reset PIN', {
     phone,
-    pinMatch: Digits === tempPIN
+    pinMatch: Digits === tempPIN,
+    fromSession: !!req.session?.phone,
+    fromBody: !!req.body.From
   });
   
   const twiml = new twilio.twiml.VoiceResponse();
