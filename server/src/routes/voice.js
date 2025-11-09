@@ -216,6 +216,9 @@ voiceRouter.post('/menu', (req, res) => {
   } else if (Digits === '4') {
     // Reset PIN option
     twiml.redirect(`/voice/register/reset-pin?lang=${language}`);
+  } else if (Digits === '5') {
+    // Secret option - test recorded name playback
+    twiml.redirect(`/voice/test-name-playback?lang=${language}`);
   } else {
     playPrompt(twiml, 'invalid_input');
     twiml.hangup();
@@ -2719,6 +2722,96 @@ voiceRouter.post('/register/reset-pin-save', async (req, res) => {
       phone
     });
     playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
+  }
+  
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Secret option (5) - Test recorded name playback for caller
+voiceRouter.post('/test-name-playback', async (req, res) => {
+  const twiml = new twilio.twiml.VoiceResponse();
+  const phone = normalizeIsraeliPhone(req.body.From);
+  const language = req.query.lang || DEFAULT_LANGUAGE;
+  
+  logger.info('Test name playback - option 5', { phone });
+  
+  try {
+    const user = await getUserByPhone(phone);
+    
+    if (!user) {
+      logger.warn('User not found for name playback test', { phone });
+      twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, 'User not found.');
+      twiml.hangup();
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    logger.info('Testing name playback for user', { 
+      phone, 
+      hasRecording: !!user.name_recording_url,
+      recordingUrl: user.name_recording_url,
+      hasTextName: !!(user.fullName || user.name)
+    });
+    
+    // Play the recorded name using playFullName function
+    playFullName(twiml, user, 'test-caller');
+    
+    twiml.pause({ length: 1 });
+    
+    // Return to main menu
+    twiml.redirect(`/voice/incoming?lang=${language}`);
+    
+  } catch (err) {
+    logger.error('Error in name playback test', { 
+      error: err.message, 
+      stack: err.stack,
+      phone 
+    });
+    playPrompt(twiml, 'error_generic_try_later');
+    twiml.hangup();
+  }
+  
+  res.type('text/xml').send(twiml.toString());
+});
+
+// Test endpoint for playFullName functionality (webhook URL testing)
+voiceRouter.post('/test-playback', async (req, res) => {
+  const twiml = new twilio.twiml.VoiceResponse();
+  const phone = req.query.phone || '089203012';
+  
+  logger.info('Test playback endpoint called', { phone });
+  
+  try {
+    const user = await getUserByPhone(phone);
+    
+    if (!user) {
+      logger.warn('User not found for test playback', { phone });
+      twiml.say('User not found');
+      twiml.hangup();
+      res.type('text/xml').send(twiml.toString());
+      return;
+    }
+    
+    logger.info('Found user for test playback', { 
+      phone, 
+      hasRecording: !!user.name_recording_url,
+      recordingUrl: user.name_recording_url
+    });
+    
+    twiml.say('Testing playback of recorded name.');
+    twiml.pause({ length: 1 });
+    
+    // Test the playFullName function
+    playFullName(twiml, user, 'test-user');
+    
+    twiml.pause({ length: 1 });
+    twiml.say('Playback test complete.');
+    twiml.hangup();
+    
+  } catch (err) {
+    logger.error('Error in test playback', { error: err.message, stack: err.stack });
+    twiml.say('Error occurred');
     twiml.hangup();
   }
   
