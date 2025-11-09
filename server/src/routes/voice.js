@@ -77,10 +77,23 @@ function playFullName(twimlNode, user, role = 'user') {
         playbackUrl = playbackUrl + '.mp3';
       }
       
+      // Add Twilio credentials to URL for authentication
+      // Format: https://ACCOUNT_SID:AUTH_TOKEN@api.twilio.com/...
+      const accountSid = process.env.TWILIO_ACCOUNT_SID;
+      const authToken = process.env.TWILIO_AUTH_TOKEN;
+      
+      if (accountSid && authToken && playbackUrl.includes('api.twilio.com')) {
+        // Insert credentials into URL
+        playbackUrl = playbackUrl.replace(
+          'https://api.twilio.com',
+          `https://${accountSid}:${authToken}@api.twilio.com`
+        );
+      }
+      
       logger.info(`Playing recorded name for ${role}`, { 
         userId: user.id, 
         originalUrl: user.name_recording_url,
-        playbackUrl: playbackUrl
+        playbackUrl: playbackUrl.replace(authToken || '', '****') // Hide token in logs
       });
       twimlNode.play(playbackUrl);
       logger.debug(`Finished setting up play for recorded name`);
