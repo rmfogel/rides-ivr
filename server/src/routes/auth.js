@@ -22,8 +22,8 @@ authRouter.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'נא להזין מספר טלפון וסיסמה' });
     }
     
-    if (!/^\d{10}$/.test(phone)) {
-      logger.warn('Login failed: invalid phone format', { phone });
+    if (!/^\d{9,10}$/.test(phone)) {
+      logger.warn('Login failed: invalid phone format', { phone, length: phone.length });
       return res.status(400).json({ error: 'מספר טלפון לא תקין' });
     }
     

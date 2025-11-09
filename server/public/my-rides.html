@@ -440,6 +440,11 @@
             border-right: 4px solid #4caf50;
         }
 
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 0;
@@ -470,26 +475,20 @@
         <div class="header">
             <div class="header-top">
                 <nav class="nav-links">
-                    <a href="/login.html">התחברות</a>
+                    <a href="#" onclick="Auth.logout(); return false;" id="logoutLink">התנתק</a>
                     <a href="/offer-ride.html">הצע נסיעה</a>
                     <a href="/request-ride.html">בקש נסיעה</a>
                     <a href="/my-rides.html" class="active">הנסיעות שלי</a>
                 </nav>
                 <h1>הנסיעות שלי</h1>
+                <p id="loadingIndicator" style="color: #666; font-size: 14px; margin-top: 8px; display: none;">
+                    <span style="display: inline-block; animation: spin 1s linear infinite;">⏳</span>
+                    טוען נסיעות...
+                </p>
             </div>
             
-            <div class="phone-input-section">
-                <div class="form-group">
-                    <label class="form-label">מספר טלפון</label>
-                    <input 
-                        type="tel" 
-                        class="form-input" 
-                        id="phoneInput" 
-                        placeholder="0501234567"
-                    >
-                </div>
-                <button class="btn btn-primary" id="loadButton">הצג נסיעות</button>
-            </div>
+            <!-- Hidden phone input for internal use -->
+            <input type="hidden" id="phone" value="">
         </div>
 
         <div id="errorMessage" class="error-message" style="display: none;"></div>
@@ -568,8 +567,10 @@
 
         // Phone validation
         function validatePhone(phone) {
-            const phoneRegex = /^0\d{9}$/;
-            return phoneRegex.test(phone.replace(/\s/g, ''));
+            const phoneRegex = /^0\d{8,9}$/;  // Support 9 or 10 digits total (starting with 0)
+            const isValid = phoneRegex.test(phone.replace(/\s/g, ''));
+            console.log('validatePhone:', phone, 'length:', phone.length, 'valid:', isValid);
+            return isValid;
         }
 
         // Format direction
@@ -719,14 +720,30 @@
 
         // Load rides
         async function loadRides() {
-            const phone = document.getElementById('phoneInput').value.trim();
+            let phone = document.getElementById('phone').value.trim();
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            console.log('loadRides called, phone:', phone);
+
+            // If phone doesn't start with 0, add it
+            if (phone && !phone.startsWith('0')) {
+                phone = '0' + phone;
+                document.getElementById('phone').value = phone;
+                console.log('Added leading 0, new phone:', phone);
+            }
 
             if (!validatePhone(phone)) {
-                showError('נא להזין מספר טלפון תקין (10 ספרות)');
+                console.error('Invalid phone format:', phone);
+                showError('נא להזין מספר טלפון תקין (9-10 ספרות)');
                 return;
             }
 
             currentPhone = phone;
+
+            // Show loading indicator
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
 
             // Hide sections and show loading
             document.getElementById('offersSection').style.display = 'none';
@@ -744,16 +761,38 @@
                 const offersData = await offersResponse.json();
                 const requestsData = await requestsResponse.json();
 
+                // Hide loading indicator
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+                
                 document.getElementById('loadingState').style.display = 'none';
 
-                if (offersResponse.ok && requestsResponse.ok) {
+                // Always try to render, even if one fails
+                if (offersResponse.ok) {
                     renderOffers(offersData.offers || []);
+                } else {
+                    console.error('Failed to load offers:', offersData);
+                    renderOffers([]);
+                }
+                
+                if (requestsResponse.ok) {
                     renderRequests(requestsData.requests || []);
                 } else {
+                    console.error('Failed to load requests:', requestsData);
+                    renderRequests([]);
+                }
+                
+                // Only show error if both failed
+                if (!offersResponse.ok && !requestsResponse.ok) {
                     showError('שגיאה בטעינת הנסיעות');
                 }
             } catch (error) {
                 console.error('Error loading rides:', error);
+                const loadingIndicator = document.getElementById('loadingIndicator');
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
                 document.getElementById('loadingState').style.display = 'none';
                 showError('אירעה שגיאה בטעינת הנסיעות');
             }
@@ -1019,19 +1058,37 @@
             }
         });
 
-        // Event listeners
-        document.getElementById('loadButton').addEventListener('click', loadRides);
-        document.getElementById('phoneInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                loadRides();
+        // Auto-load rides when user info is available
+        window.addEventListener('userLoaded', (event) => {
+            const phoneInput = document.getElementById('phone');
+            if (event.detail && event.detail.phone) {
+                phoneInput.value = event.detail.phone;
+                // Auto-load rides
+                setTimeout(() => loadRides(), 500);
             }
         });
+
+        // Fallback: If userLoaded event doesn't fire, try to get user info directly
+        setTimeout(async () => {
+            const phoneInput = document.getElementById('phone');
+            if (!phoneInput.value && window.Auth) {
+                try {
+                    const user = await window.Auth.getCurrentUser();
+                    if (user && user.phone) {
+                        phoneInput.value = user.phone;
+                        loadRides();
+                    }
+                } catch (error) {
+                    console.error('Error getting user info:', error);
+                }
+            }
+        }, 1000);
 
         // Load phone from URL if provided and auto-load
         const urlParams = new URLSearchParams(window.location.search);
         const phoneParam = urlParams.get('phone');
         if (phoneParam) {
-            document.getElementById('phoneInput').value = phoneParam;
+            document.getElementById('phone').value = phoneParam;
             loadRides();
         }
     </script>

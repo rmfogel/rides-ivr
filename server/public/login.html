@@ -251,7 +251,7 @@
                         type="tel" 
                         id="phone" 
                         name="phone" 
-                        placeholder="050-1234567" 
+                        placeholder="050-1234567 או 02-1234567" 
                         required
                         pattern="[0-9\-]+"
                         maxlength="12"
@@ -312,9 +312,11 @@
             let value = e.target.value.replace(/[^\d]/g, '');
             if (value.length > 10) value = value.slice(0, 10);
             
-            // Format as 050-1234567
+            // Format as 050-1234567 (10 digits) or 02-1234567 (9 digits)
             if (value.length > 3) {
                 value = value.slice(0, 3) + '-' + value.slice(3);
+            } else if (value.length > 2) {
+                value = value.slice(0, 2) + '-' + value.slice(2);
             }
             
             e.target.value = value;
@@ -352,9 +354,9 @@
             const phone = phoneInput.value.replace(/[^\d]/g, '');
             const pin = pinInput.value;
 
-            // Validate inputs
-            if (phone.length !== 10) {
-                showError('מספר טלפון לא תקין. יש להזין 10 ספרות');
+            // Validate inputs - support 9 or 10 digit phone numbers
+            if (phone.length !== 9 && phone.length !== 10) {
+                showError('מספר טלפון לא תקין. יש להזין 9 או 10 ספרות');
                 return;
             }
 

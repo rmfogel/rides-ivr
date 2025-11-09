@@ -141,6 +141,20 @@
             margin-top: 4px;
         }
 
+        .phone-display {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-family: 'Heebo', sans-serif;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            color: #202124;
+            font-weight: 500;
+            direction: ltr;
+            text-align: right;
+        }
+
         .error-message {
             color: #d93025;
             font-size: 12px;
@@ -287,7 +301,7 @@
     <div class="container">
         <div class="header">
             <nav class="nav-links">
-                <a href="/login.html">התחברות</a>
+                <a href="#" onclick="Auth.logout(); return false;" id="logoutLink">התנתק</a>
                 <a href="/offer-ride.html" class="active">הצע נסיעה</a>
                 <a href="/request-ride.html">בקש נסיעה</a>
                 <a href="/my-rides.html">הנסיעות שלי</a>
@@ -303,19 +317,11 @@
             <form id="offerForm" novalidate>
                 <div class="form-group">
                     <label class="form-label">
-                        <span class="required">*</span>
                         מספר טלפון
                     </label>
-                    <input 
-                        type="tel" 
-                        class="form-input" 
-                        id="phone" 
-                        name="phone" 
-                        placeholder="0501234567"
-                        required
-                    >
-                    <div class="form-helper">מספר הטלפון שלך (10 ספרות)</div>
-                    <div class="error-message" id="phoneError">נא להזין מספר טלפון תקין</div>
+                    <div class="phone-display" id="phoneDisplay">טוען...</div>
+                    <input type="hidden" id="phone" name="phone">
+                    <div class="form-helper">מספר הטלפון שלך</div>
                 </div>
 
                 <div class="form-group">
@@ -455,7 +461,7 @@
 
         // Phone validation
         function validatePhone(phone) {
-            const phoneRegex = /^0\d{9}$/;
+            const phoneRegex = /^0\d{8,9}$/;  // Support 9 or 10 digits (8-9 after the 0)
             return phoneRegex.test(phone.replace(/\s/g, ''));
         }
 
@@ -518,7 +524,7 @@
             // Phone
             const phone = document.getElementById('phone').value.trim();
             if (!phone || !validatePhone(phone)) {
-                showError('phone', 'נא להזין מספר טלפון תקין (10 ספרות)');
+                showError('phone', 'נא להזין מספר טלפון תקין (9-10 ספרות)');
                 isValid = false;
             }
 
@@ -653,7 +659,44 @@
         const phoneParam = urlParams.get('phone');
         if (phoneParam) {
             document.getElementById('phone').value = phoneParam;
+            updatePhoneDisplay(phoneParam);
         }
+
+        // Load phone from session
+        async function loadUserPhone() {
+            try {
+                if (window.Auth) {
+                    const user = await window.Auth.getCurrentUser();
+                    if (user && user.phone) {
+                        document.getElementById('phone').value = user.phone;
+                        updatePhoneDisplay(user.phone);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading user phone:', error);
+            }
+        }
+
+        // Update phone display
+        function updatePhoneDisplay(phone) {
+            const phoneDisplay = document.getElementById('phoneDisplay');
+            if (phone) {
+                // Format phone with dashes: 050-1234567 or 02-1234567
+                const cleaned = phone.replace(/[^\d]/g, '');
+                let formatted = cleaned;
+                if (cleaned.length === 10) {
+                    formatted = cleaned.substring(0, 3) + '-' + cleaned.substring(3);
+                } else if (cleaned.length === 9) {
+                    formatted = cleaned.substring(0, 2) + '-' + cleaned.substring(2);
+                }
+                phoneDisplay.textContent = formatted;
+            } else {
+                phoneDisplay.textContent = 'לא זמין';
+            }
+        }
+
+        // Load phone on page load
+        loadUserPhone();
     </script>
 </body>
 </html>

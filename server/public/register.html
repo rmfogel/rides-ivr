@@ -423,8 +423,8 @@
                         required
                         pattern="0\d{9}"
                     >
-                    <div class="form-helper">פורמט: 0501234567 (10 ספרות, ללא מקפים)</div>
-                    <div class="error-message" id="phoneError">נא להזין מספר טלפון תקין (10 ספרות)</div>
+                    <div class="form-helper">פורמט: 0501234567 או 021234567 (9-10 ספרות, ללא מקפים)</div>
+                    <div class="error-message" id="phoneError">נא להזין מספר טלפון תקין (9-10 ספרות)</div>
                 </div>
 
                 <div class="form-group">
@@ -485,7 +485,7 @@
 
         // Phone validation
         function validatePhone(phone) {
-            const phoneRegex = /^0\d{9}$/;
+            const phoneRegex = /^0\d{8,9}$/;  // Support 9 or 10 digits (8-9 after the 0)
             return phoneRegex.test(phone.replace(/\s/g, ''));
         }
 
@@ -556,7 +556,7 @@
             // Phone
             const phone = document.getElementById('phone').value.trim();
             if (!phone || !validatePhone(phone)) {
-                showError('phone', 'נא להזין מספר טלפון תקין (10 ספרות)');
+                showError('phone', 'נא להזין מספר טלפון תקין (9-10 ספרות)');
                 isValid = false;
             }
 

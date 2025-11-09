@@ -62,11 +62,12 @@ function playFullName(twimlNode, user, role = 'user') {
   try {
     // Priority 1: Use recorded name if available
     if (user.name_recording_url) {
-      logger.debug(`Playing recorded name for ${role}`, { 
+      logger.info(`Playing recorded name for ${role}`, { 
         userId: user.id, 
         recordingUrl: user.name_recording_url 
       });
       twimlNode.play(user.name_recording_url);
+      logger.debug(`Finished setting up play for recorded name`);
       return;
     }
     
@@ -77,6 +78,8 @@ function playFullName(twimlNode, user, role = 'user') {
       logger.debug(`No name found for ${role}, skipping name playback`, { userId: user.id });
       return;
     }
+    
+    logger.info(`Playing TTS name for ${role}`, { name: fullName });
     
     // Use Polly Joanna (English female voice) - works better for reading Hebrew names
     twimlNode.say({ 

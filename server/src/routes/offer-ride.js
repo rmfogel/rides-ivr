@@ -32,7 +32,7 @@ function normalizeIsraeliPhone(phone) {
  * Validate phone number format (Israeli)
  */
 function validatePhone(phone) {
-  const phoneRegex = /^0\d{9}$/;
+  const phoneRegex = /^0\d{8,9}$/;  // Support 9 or 10 digits (8-9 after the 0)
   return phoneRegex.test(phone);
 }
 

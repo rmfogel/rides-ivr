@@ -42,7 +42,27 @@
             return false;
         }
         
-        return true;
+        // Auto-fill phone number if there's a phone input field
+        if (auth.phone) {
+            const phoneInput = document.getElementById('phone');
+            if (phoneInput && !phoneInput.value) {
+                phoneInput.value = auth.phone;
+                // Make it readonly if it's a visible input (not hidden)
+                if (phoneInput.type !== 'hidden') {
+                    phoneInput.setAttribute('readonly', 'readonly');
+                    phoneInput.style.backgroundColor = '#f5f5f5';
+                    phoneInput.style.cursor = 'not-allowed';
+                }
+            }
+        }
+        
+        return auth;
+    }
+    
+    // Get current user info
+    async function getCurrentUser() {
+        const auth = await checkAuth();
+        return auth.authenticated ? { phone: auth.phone } : null;
     }
     
     // Logout function
@@ -65,15 +85,20 @@
     window.Auth = {
         check: checkAuth,
         require: requireAuth,
+        getCurrentUser: getCurrentUser,
         logout: logout
     };
     
     // Auto-check authentication on protected pages
     // (pages that are not login.html)
     if (!window.location.pathname.includes('login.html')) {
-        // Check auth after a short delay to allow page to load
-        setTimeout(() => {
-            requireAuth();
+        // Check auth and auto-fill phone after a short delay to allow page to load
+        setTimeout(async () => {
+            const auth = await requireAuth();
+            // Dispatch event so pages can react to user being loaded
+            if (auth && auth.phone) {
+                window.dispatchEvent(new CustomEvent('userLoaded', { detail: { phone: auth.phone } }));
+            }
         }, 100);
     }
 })();
