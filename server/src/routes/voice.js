@@ -78,20 +78,20 @@ function playFullName(twimlNode, user, role = 'user') {
       
       if (recordingMatch) {
         const recordingSid = recordingMatch[1];
-        
-        // Use Twilio's Media URL format which doesn't require authentication in TwiML Play
-        // Format: https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Media
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
-        playbackUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}`;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        
+        // Build proper authenticated URL for Twilio recording
+        // Format: https://ACCOUNT_SID:AUTH_TOKEN@api.twilio.com/2010-04-01/Accounts/ACCOUNT_SID/Recordings/RECORDING_SID.mp3
+        playbackUrl = `https://${accountSid}:${authToken}@api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`;
         
         logger.info(`Playing recorded name for ${role}`, { 
           userId: user.id, 
           originalUrl: user.name_recording_url,
           recordingSid: recordingSid,
-          playbackUrl: playbackUrl
+          playbackUrl: playbackUrl.replace(authToken, '****') // Hide token in logs
         });
         
-        // TwiML Play will handle authentication automatically when playing Twilio recordings
         twimlNode.play(playbackUrl);
         logger.debug(`Finished setting up play for recorded name`);
         return;
