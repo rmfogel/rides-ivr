@@ -188,13 +188,15 @@ export async function getOfferWithUser(id) {
     doc.user = normalize(doc.user);
   }
   
-  // Log phone numbers for debugging
+  // Log phone numbers and recording URL for debugging
   console.log('getOfferWithUser result:', {
     offerId: id,
     driver_phone: doc.driver_phone,
     driver_phone_length: doc.driver_phone?.length,
     user_phone: doc.user?.phone,
-    user_phone_length: doc.user?.phone?.length
+    user_phone_length: doc.user?.phone?.length,
+    has_name_recording: !!doc.user?.name_recording_url,
+    name_recording_url: doc.user?.name_recording_url
   });
   
   return doc;
@@ -233,13 +235,15 @@ export async function getRequestWithUser(id) {
     doc.user = normalize(doc.user);
   }
   
-  // Log phone numbers for debugging
+  // Log phone numbers and recording URL for debugging
   console.log('getRequestWithUser result:', {
     requestId: id,
     rider_phone: doc.rider_phone,
     rider_phone_length: doc.rider_phone?.length,
     user_phone: doc.user?.phone,
-    user_phone_length: doc.user?.phone?.length
+    user_phone_length: doc.user?.phone?.length,
+    has_name_recording: !!doc.user?.name_recording_url,
+    name_recording_url: doc.user?.name_recording_url
   });
   
   return doc;

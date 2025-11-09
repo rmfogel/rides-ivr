@@ -59,14 +59,30 @@ function playFullName(twimlNode, user, role = 'user') {
     return;
   }
   
+  // Log user object details for debugging
+  logger.debug(`playFullName called for ${role}`, {
+    userId: user.id,
+    hasRecordingUrl: !!user.name_recording_url,
+    recordingUrl: user.name_recording_url,
+    hasName: !!(user.fullName || user.name),
+    name: user.fullName || user.name
+  });
+  
   try {
     // Priority 1: Use recorded name if available
     if (user.name_recording_url) {
+      // Twilio recording URLs need .mp3 extension to play audio
+      let playbackUrl = user.name_recording_url;
+      if (!playbackUrl.endsWith('.mp3') && !playbackUrl.includes('.mp3?')) {
+        playbackUrl = playbackUrl + '.mp3';
+      }
+      
       logger.info(`Playing recorded name for ${role}`, { 
         userId: user.id, 
-        recordingUrl: user.name_recording_url 
+        originalUrl: user.name_recording_url,
+        playbackUrl: playbackUrl
       });
-      twimlNode.play(user.name_recording_url);
+      twimlNode.play(playbackUrl);
       logger.debug(`Finished setting up play for recorded name`);
       return;
     }
