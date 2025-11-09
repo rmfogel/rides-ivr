@@ -2342,9 +2342,10 @@ voiceRouter.post('/register/save-name', async (req, res) => {
     twiml.play(recordingUrl);
     
     // Ask user to confirm or re-record
+    // Pass recordingUrl as query parameter since session might not persist
     const gather = twiml.gather({
       numDigits: 1,
-      action: `/voice/register/confirm-recording?lang=${language}`,
+      action: `/voice/register/confirm-recording?lang=${language}&recordingUrl=${encodeURIComponent(recordingUrl)}`,
       timeout: 5
     });
     playPrompt(gather, '261'); // "לְשׁמִירַת הַהַקְלָטָה הַקֵּשׁ 1. לְהַקְלָטָה מֵחָדָשׁ הַקֵּשׁ 2."
@@ -2371,12 +2372,16 @@ voiceRouter.post('/register/confirm-recording', async (req, res) => {
   const language = req.query.lang || (req.session && req.session.language) || DEFAULT_LANGUAGE;
   const phone = req.session?.phone || normalizeIsraeliPhone(req.body.Caller || req.body.From || '');
   const choice = req.body.Digits;
-  const recordingUrl = req.session?.tempRecordingUrl;
+  // Try to get recordingUrl from query parameter first, then session
+  const recordingUrl = req.query.recordingUrl || req.session?.tempRecordingUrl;
   
   logger.info('User recording choice', {
     phone,
     choice,
-    recordingUrl
+    recordingUrl,
+    hasRecordingUrl: !!recordingUrl,
+    fromQuery: !!req.query.recordingUrl,
+    fromSession: !!req.session?.tempRecordingUrl
   });
   
   const twiml = new twilio.twiml.VoiceResponse();
@@ -2396,14 +2401,19 @@ voiceRouter.post('/register/confirm-recording', async (req, res) => {
         await saveNameRecording(phone, recordingUrl);
         logger.info('Name recording saved after user confirmation', { phone, recordingUrl });
         
-        // Clear temp recording from session
-        delete req.session.tempRecordingUrl;
+        // Clear temp recording from session if it exists
+        if (req.session?.tempRecordingUrl) {
+          delete req.session.tempRecordingUrl;
+        }
         
         // Confirm and proceed to PIN selection
         playPrompt(twiml, '252'); // "תּוֹדָה! הַשֵּׁם נִקְלַט בְּהַצְלָחָה."
         twiml.redirect(`/voice/register/choose-pin?lang=${language}`);
       } else {
-        logger.error('No recording URL in session to save');
+        logger.error('No recording URL available to save', { 
+          fromQuery: !!req.query.recordingUrl,
+          fromSession: !!req.session?.tempRecordingUrl 
+        });
         playPrompt(twiml, 'error_generic_try_later');
         twiml.redirect(`/voice/register/record-name?lang=${language}`);
       }
@@ -2411,16 +2421,22 @@ voiceRouter.post('/register/confirm-recording', async (req, res) => {
       // User wants to re-record
       logger.info('User chose to re-record name', { phone });
       
-      // Clear temp recording from session
-      delete req.session.tempRecordingUrl;
+      // Clear temp recording from session if it exists
+      if (req.session?.tempRecordingUrl) {
+        delete req.session.tempRecordingUrl;
+      }
       
       // Redirect back to recording
       twiml.redirect(`/voice/register/record-name?lang=${language}`);
     } else {
-      // Invalid input, ask again
+      // Invalid input, ask again - pass recordingUrl in redirect
       logger.warn('Invalid input for recording confirmation', { phone, choice });
       playPrompt(twiml, 'error_invalid_input');
-      twiml.redirect(`/voice/register/save-name?lang=${language}&RecordingUrl=${encodeURIComponent(recordingUrl || '')}`);
+      if (recordingUrl) {
+        twiml.redirect(`/voice/register/confirm-recording?lang=${language}&recordingUrl=${encodeURIComponent(recordingUrl)}`);
+      } else {
+        twiml.redirect(`/voice/register/record-name?lang=${language}`);
+      }
     }
   } catch (err) {
     logger.error('Error confirming name recording', {
