@@ -71,33 +71,36 @@ function playFullName(twimlNode, user, role = 'user') {
   try {
     // Priority 1: Use recorded name if available
     if (user.name_recording_url) {
-      // Twilio recording URLs need .mp3 extension to play audio
       let playbackUrl = user.name_recording_url;
-      if (!playbackUrl.endsWith('.mp3') && !playbackUrl.includes('.mp3?')) {
-        playbackUrl = playbackUrl + '.mp3';
+      
+      // Extract Recording SID from Twilio URL
+      const recordingMatch = playbackUrl.match(/Recordings\/(RE[a-f0-9]+)/i);
+      
+      if (recordingMatch) {
+        const recordingSid = recordingMatch[1];
+        
+        // Use Twilio's Media URL format which doesn't require authentication in TwiML Play
+        // Format: https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Media
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        playbackUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}`;
+        
+        logger.info(`Playing recorded name for ${role}`, { 
+          userId: user.id, 
+          originalUrl: user.name_recording_url,
+          recordingSid: recordingSid,
+          playbackUrl: playbackUrl
+        });
+        
+        // TwiML Play will handle authentication automatically when playing Twilio recordings
+        twimlNode.play(playbackUrl);
+        logger.debug(`Finished setting up play for recorded name`);
+        return;
+      } else {
+        logger.warn(`Could not extract Recording SID from URL`, { 
+          userId: user.id,
+          url: user.name_recording_url 
+        });
       }
-      
-      // Add Twilio credentials to URL for authentication
-      // Format: https://ACCOUNT_SID:AUTH_TOKEN@api.twilio.com/...
-      const accountSid = process.env.TWILIO_ACCOUNT_SID;
-      const authToken = process.env.TWILIO_AUTH_TOKEN;
-      
-      if (accountSid && authToken && playbackUrl.includes('api.twilio.com')) {
-        // Insert credentials into URL
-        playbackUrl = playbackUrl.replace(
-          'https://api.twilio.com',
-          `https://${accountSid}:${authToken}@api.twilio.com`
-        );
-      }
-      
-      logger.info(`Playing recorded name for ${role}`, { 
-        userId: user.id, 
-        originalUrl: user.name_recording_url,
-        playbackUrl: playbackUrl.replace(authToken || '', '****') // Hide token in logs
-      });
-      twimlNode.play(playbackUrl);
-      logger.debug(`Finished setting up play for recorded name`);
-      return;
     }
     
     // Priority 2: Fallback to TTS with text name
