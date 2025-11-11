@@ -346,10 +346,14 @@ offerRideRouter.get('/', async (req, res) => {
       .sort({ created_at: -1 })
       .toArray();
     
-    // Filter out rides that have already passed
+    // Filter out rides from past days (keep all rides from today until end of day)
     const activeOffers = userOffers.filter(offer => {
       const departureTime = DateTime.fromJSDate(offer.departure_time).setZone(TZ);
-      return departureTime >= nowInIsrael;
+      const rideDate = departureTime.startOf('day');
+      const today = nowInIsrael.startOf('day');
+      
+      // Keep rides from today and future dates
+      return rideDate >= today;
     });
 
     logger.info('Retrieved offers for phone', {
