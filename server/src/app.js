@@ -39,11 +39,20 @@ app.use((req, res, next) => {
 
 // Session middleware using memory store for development/testing
 // In production, you would use a proper session store like MongoDB or Redis
+const isProduction = process.env.NODE_ENV === 'production';
 app.use(session({
   secret: process.env.SESSION_SECRET || 'rides-ivr-secret',
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 60 * 60 * 1000 } // 1 hour
+  saveUninitialized: false, // Don't create session until something stored
+  name: 'rides.sid', // Custom session cookie name
+  cookie: { 
+    secure: isProduction, // HTTPS only in production
+    httpOnly: true, // Prevent XSS attacks
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: isProduction ? 'none' : 'lax', // Allow cross-site cookies in production (Render)
+    path: '/' // Cookie available for all paths
+  },
+  proxy: isProduction // Trust the reverse proxy (Render) in production
 }));
 
 // Set default language for the application

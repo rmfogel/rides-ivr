@@ -376,6 +376,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'same-origin', // Include cookies in request
                     body: JSON.stringify({ phone, pin }),
                 });
 
@@ -383,9 +384,18 @@
 
                 if (response.ok) {
                     showSuccess();
-                    // Redirect to main page after 1 second
+                    
+                    // Get the return URL from sessionStorage (set by auth.js)
+                    const returnTo = sessionStorage.getItem('returnTo');
+                    sessionStorage.removeItem('returnTo'); // Clean up
+                    
+                    // Redirect to the original page or default to my-rides
+                    const redirectUrl = returnTo || '/my-rides.html';
+                    
+                    console.log('Login successful, redirecting to:', redirectUrl);
+                    
                     setTimeout(() => {
-                        window.location.href = '/my-rides.html';
+                        window.location.href = redirectUrl;
                     }, 1000);
                 } else {
                     showError(data.error || 'שגיאה בהתחברות. נסה שוב');
