@@ -12,6 +12,7 @@ import { duplicateRouter } from './routes/duplicate.js';
 import { registerRouter } from './routes/register.js';
 import { offerRideRouter } from './routes/offer-ride.js';
 import { requestRideRouter } from './routes/request-ride.js';
+import { matchRouter } from './routes/match.js';
 import authRouter from './routes/auth.js';
 import { collections, getDb } from './db/mongoClient.js';
 import * as logger from './utils/logger.js';
@@ -71,6 +72,7 @@ app.use('/api/auth', authRouter);
 // app.use('/api/register', registerRouter);  // Disabled: Registration now via IVR only
 app.use('/api/rides/offer', offerRideRouter);
 app.use('/api/rides/request', requestRideRouter);
+app.use('/api/rides/match', matchRouter);
 
 // Serve static files (recorded prompts) from /public under /static
 const __filename = fileURLToPath(import.meta.url);

@@ -263,6 +263,207 @@
             gap: 16px;
         }
 
+        /* Modal styling */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            background-color: #673ab7;
+            color: white;
+            padding: 20px 24px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 24px;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            line-height: 1;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .modal-close:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .success-message-modal {
+            background-color: #e8f5e9;
+            border-right: 4px solid #4caf50;
+            padding: 16px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .matches-list {
+            margin-top: 20px;
+        }
+
+        .match-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            background-color: #fafafa;
+        }
+
+        .match-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .match-card-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #673ab7;
+        }
+
+        .match-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .match-info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .match-info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .match-info-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: #202124;
+        }
+
+        .match-notes {
+            background-color: #fff3e0;
+            border-right: 3px solid #ff9800;
+            padding: 12px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .match-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .match-button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .match-button-accept {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .match-button-accept:hover {
+            background-color: #45a049;
+        }
+
+        .match-button-decline {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .match-button-decline:hover {
+            background-color: #da190b;
+        }
+
+        .match-button:disabled {
+            background-color: #9e9e9e;
+            cursor: not-allowed;
+        }
+
+        .no-matches-message {
+            text-align: center;
+            padding: 32px;
+            color: #666;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        .modal-footer-button {
+            background-color: #673ab7;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .modal-footer-button:hover {
+            background-color: #5e35b1;
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 0;
@@ -739,26 +940,35 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Show success message
-                    successMessage.innerHTML = `
-                        <strong>הבקשה נשלחה בהצלחה!</strong><br>
-                        ${data.message}
-                        ${data.matchCount > 0 ? `<br><br>נמצאו ${data.matchCount} התאמות אפשריות. נציג יצור איתך קשר בקרוב.` : ''}
-                    `;
-                    successMessage.style.display = 'block';
-                    form.reset();
-                    dateInput.value = today;
-                    updateTotalPassengers();
-                    
-                    // Scroll to success message
-                    successMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    
-                    // Optionally redirect to my-rides after a delay
-                    setTimeout(() => {
-                        if (confirm('האם תרצה לראות את הבקשות שלך?')) {
-                            window.location.href = `/my-rides.html?phone=${encodeURIComponent(formData.phone)}`;
-                        }
-                    }, 2000);
+                    // Check if there are matches
+                    if (data.matches && data.matches.length > 0) {
+                        // Show matches modal
+                        showMatchesModal(data.matches, formData.phone);
+                        form.reset();
+                        dateInput.value = today;
+                        updateTotalPassengers();
+                    } else {
+                        // No matches found - show success message
+                        successMessage.innerHTML = `
+                            <strong>הבקשה נשלחה בהצלחה!</strong><br>
+                            ${data.message}<br>
+                            לא נמצאו התאמות כרגע. נעדכן אותך כאשר תמצא הצעה מתאימה.
+                        `;
+                        successMessage.style.display = 'block';
+                        form.reset();
+                        dateInput.value = today;
+                        updateTotalPassengers();
+                        
+                        // Scroll to success message
+                        successMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        
+                        // Optionally redirect to my-rides after a delay
+                        setTimeout(() => {
+                            if (confirm('האם תרצה לראות את הבקשות שלך?')) {
+                                window.location.href = `/my-rides.html?phone=${encodeURIComponent(formData.phone)}`;
+                            }
+                        }, 2000);
+                    }
                 } else {
                     alert('שגיאה: ' + (data.error || 'שגיאה לא ידועה'));
                 }
@@ -831,6 +1041,207 @@
 
         // Initialize total passengers display
         updateTotalPassengers();
+
+        // Modal functions
+        let currentUserPhone = '';
+
+        function showMatchesModal(matches, phone) {
+            currentUserPhone = phone;
+            const modal = document.getElementById('matchesModal');
+            const matchCountEl = document.getElementById('modalMatchCount');
+            const matchesList = document.getElementById('matchesList');
+            
+            // Update match count
+            matchCountEl.textContent = `נמצאו ${matches.length} הצעות רכיבה מתאימות:`;
+            
+            // Build matches HTML
+            matchesList.innerHTML = matches.map((match, index) => {
+                const offer = match.offer;
+                const driverName = offer.driver_name || 'לא צוין';
+                const driverPhone = offer.driver_phone || '';
+                
+                // Format date
+                const dateObj = new Date(offer.date);
+                const formattedDate = dateObj.toLocaleDateString('he-IL', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                // Format time
+                const departureTime = offer.time || 'לא צוין';
+                
+                return `
+                    <div class="match-card" id="match-${match.matchId}">
+                        <div class="match-card-header">
+                            <div class="match-card-title">הצעה #${index + 1}</div>
+                        </div>
+                        <div class="match-info">
+                            <div class="match-info-item">
+                                <div class="match-info-label">שם הנהג</div>
+                                <div class="match-info-value">${driverName}</div>
+                            </div>
+                            <div class="match-info-item">
+                                <div class="match-info-label">טלפון</div>
+                                <div class="match-info-value">${driverPhone}</div>
+                            </div>
+                            <div class="match-info-item">
+                                <div class="match-info-label">תאריך</div>
+                                <div class="match-info-value">${formattedDate}</div>
+                            </div>
+                            <div class="match-info-item">
+                                <div class="match-info-label">שעת יציאה</div>
+                                <div class="match-info-value">${departureTime}</div>
+                            </div>
+                            <div class="match-info-item">
+                                <div class="match-info-label">מקומות פנויים</div>
+                                <div class="match-info-value">${offer.seats || 0}</div>
+                            </div>
+                            <div class="match-info-item">
+                                <div class="match-info-label">מקומות מוקצים</div>
+                                <div class="match-info-value">
+                                    ${match.allocated_seats || 0} (גברים: ${match.allocated_male || 0}, נשים: ${match.allocated_female || 0})
+                                </div>
+                            </div>
+                        </div>
+                        ${offer.notes ? `
+                            <div class="match-notes">
+                                <strong>הערות:</strong> ${offer.notes}
+                            </div>
+                        ` : ''}
+                        <div class="match-actions">
+                            <button class="match-button match-button-accept" onclick="acceptMatch('${match.matchId}')">
+                                אשר התאמה
+                            </button>
+                            <button class="match-button match-button-decline" onclick="declineMatch('${match.matchId}')">
+                                דחה התאמה
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Show modal
+            modal.classList.add('show');
+        }
+
+        function closeMatchesModal() {
+            const modal = document.getElementById('matchesModal');
+            modal.classList.remove('show');
+        }
+
+        function goToMyRides() {
+            if (currentUserPhone) {
+                window.location.href = `/my-rides.html?phone=${encodeURIComponent(currentUserPhone)}`;
+            } else {
+                window.location.href = '/my-rides.html';
+            }
+        }
+
+        async function acceptMatch(matchId) {
+            const matchCard = document.getElementById(`match-${matchId}`);
+            const buttons = matchCard.querySelectorAll('.match-button');
+            
+            // Disable buttons
+            buttons.forEach(btn => btn.disabled = true);
+            
+            try {
+                const response = await fetch(`/api/rides/match/${matchId}/accept?phone=${encodeURIComponent(currentUserPhone)}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Update card to show success
+                    matchCard.style.backgroundColor = '#e8f5e9';
+                    matchCard.querySelector('.match-actions').innerHTML = `
+                        <div style="text-align: center; color: #4caf50; font-weight: 500; padding: 12px;">
+                            ✓ ההתאמה אושרה בהצלחה!
+                        </div>
+                    `;
+                } else {
+                    alert('שגיאה באישור ההתאמה: ' + (data.error || 'שגיאה לא ידועה'));
+                    buttons.forEach(btn => btn.disabled = false);
+                }
+            } catch (error) {
+                console.error('Error accepting match:', error);
+                alert('אירעה שגיאה באישור ההתאמה. אנא נסה שוב.');
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        async function declineMatch(matchId) {
+            const matchCard = document.getElementById(`match-${matchId}`);
+            const buttons = matchCard.querySelectorAll('.match-button');
+            
+            if (!confirm('האם אתה בטוח שברצונך לדחות התאמה זו?')) {
+                return;
+            }
+            
+            // Disable buttons
+            buttons.forEach(btn => btn.disabled = true);
+            
+            try {
+                const response = await fetch(`/api/rides/match/${matchId}/decline?phone=${encodeURIComponent(currentUserPhone)}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Update card to show declined
+                    matchCard.style.backgroundColor = '#ffebee';
+                    matchCard.querySelector('.match-actions').innerHTML = `
+                        <div style="text-align: center; color: #f44336; font-weight: 500; padding: 12px;">
+                            ההתאמה נדחתה
+                        </div>
+                    `;
+                } else {
+                    alert('שגיאה בדחיית ההתאמה: ' + (data.error || 'שגיאה לא ידועה'));
+                    buttons.forEach(btn => btn.disabled = false);
+                }
+            } catch (error) {
+                console.error('Error declining match:', error);
+                alert('אירעה שגיאה בדחיית ההתאמה. אנא נסה שוב.');
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        // Close modal on outside click
+        document.getElementById('matchesModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeMatchesModal();
+            }
+        });
     </script>
+
+    <!-- Matches Modal -->
+    <div id="matchesModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>התאמות נמצאו!</h2>
+                <button class="modal-close" onclick="closeMatchesModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="success-message-modal">
+                    <strong>הבקשה נשלחה בהצלחה!</strong>
+                    <div id="modalMatchCount"></div>
+                </div>
+                <div id="matchesList" class="matches-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-footer-button" onclick="goToMyRides()">עבור לנסיעות שלי</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

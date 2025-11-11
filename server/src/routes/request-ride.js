@@ -290,13 +290,17 @@ requestRideRouter.post('/', async (req, res) => {
     // Try to find matches immediately
     const { offers } = await collections();
     
-    // Find compatible offers
+    // Get current time in Israel timezone for comparison
+    const nowInIsrael = DateTime.now().setZone(TZ);
+    
+    // Find compatible offers (only future rides)
     const query = {
       direction: direction,
       status: 'active',
       departure_time: { 
         $gte: earliestDateTime.toJSDate(),
-        $lte: latestDateTime.toJSDate()
+        $lte: latestDateTime.toJSDate(),
+        $gte: nowInIsrael.toJSDate() // Ensure the ride hasn't passed
       }
     };
 
@@ -314,6 +318,40 @@ requestRideRouter.post('/', async (req, res) => {
       matchCount: matches.length
     });
 
+    // Populate matches with full offer details
+    const populatedMatches = await Promise.all(
+      matches.slice(0, 10).map(async (match) => {
+        const offer = await getOfferById(match.offer_id);
+        if (!offer) return null;
+        
+        const departureDateTime = DateTime.fromJSDate(offer.departure_time).setZone(TZ);
+        
+        return {
+          matchId: match.id,
+          status: match.status,
+          allocated_male: match.allocated_male || 0,
+          allocated_female: match.allocated_female || 0,
+          allocated_anygender: match.allocated_anygender || 0,
+          allocated_couples: match.allocated_couples || 0,
+          offer: {
+            id: offer.id,
+            driver_phone: offer.driver_phone,
+            driver_name: offer.driver_name,
+            direction: offer.direction,
+            date: departureDateTime.toFormat('dd/MM/yyyy'),
+            departureTime: departureDateTime.toFormat('HH:mm'),
+            totalSeats: (offer.seats_male_only || 0) + (offer.seats_female_only || 0) + (offer.seats_anygender || 0),
+            maleOnlySeats: offer.seats_male_only || 0,
+            femaleOnlySeats: offer.seats_female_only || 0,
+            anygenderSeats: offer.seats_anygender || 0,
+            notes: offer.notes
+          }
+        };
+      })
+    );
+
+    const validMatches = populatedMatches.filter(m => m !== null);
+
     // Return success response with matches
     res.status(201).json({
       success: true,
@@ -323,6 +361,8 @@ requestRideRouter.post('/', async (req, res) => {
         earliestTime: earliestDateTime.toISO(),
         latestTime: latestDateTime.toISO(),
         preferredTime: preferredDateTime ? preferredDateTime.toISO() : null,
+        earliestTimeDisplay: earliestDateTime.toFormat('dd/MM/yyyy HH:mm'),
+        latestTimeDisplay: latestDateTime.toFormat('HH:mm'),
         totalPassengers,
         maleCount: males,
         femaleCount: females,
@@ -331,13 +371,9 @@ requestRideRouter.post('/', async (req, res) => {
         together: rideRequest.together
       },
       matchCount: matches.length,
-      matches: matches.slice(0, 5).map(m => ({
-        matchId: m.id,
-        offerId: m.offer_id,
-        score: m.score
-      })),
+      matches: validMatches,
       message: matches.length > 0 
-        ? `נמצאו ${matches.length} התאמות אפשריות לבקשה שלך!`
+        ? `נמצאו ${matches.length} התאמות! אנא אשר או דחה כל התאמה.`
         : 'הבקשה נרשמה בהצלחה. נעדכן אותך כשנמצא התאמה.'
     });
 
@@ -379,6 +415,9 @@ requestRideRouter.get('/', async (req, res) => {
 
     const { requests } = await collections();
     
+    // Get current time in Israel timezone
+    const nowInIsrael = DateTime.now().setZone(TZ);
+    
     // Get all requests for this phone
     const userRequests = await requests
       .find({ 
@@ -387,14 +426,22 @@ requestRideRouter.get('/', async (req, res) => {
       })
       .sort({ created_at: -1 })
       .toArray();
+    
+    // Filter out rides that have already passed
+    const activeRequests = userRequests.filter(request => {
+      const latestTime = DateTime.fromJSDate(request.latest_time).setZone(TZ);
+      return latestTime >= nowInIsrael;
+    });
 
     logger.info('Retrieved requests for phone', {
       phone: cleanPhone,
-      count: userRequests.length
+      totalCount: userRequests.length,
+      activeCount: activeRequests.length,
+      filteredPastRides: userRequests.length - activeRequests.length
     });
 
     // Format the response
-    const formattedRequests = userRequests.map(request => {
+    const formattedRequests = activeRequests.map(request => {
       const earliestDateTime = DateTime.fromJSDate(request.earliest_time).setZone(TZ);
       const latestDateTime = DateTime.fromJSDate(request.latest_time).setZone(TZ);
       const preferredDateTime = request.preferred_time ? DateTime.fromJSDate(request.preferred_time).setZone(TZ) : null;
