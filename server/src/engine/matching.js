@@ -1,4 +1,4 @@
-import { addMatch, getRequestById, getOfferById } from "../db/repo.js";
+import { addMatch, getRequestById, getOfferById, updateOfferStatusByAllocations, updateRequestStatusByAllocations } from "../db/repo.js";
 import { ringbackRider, ringbackDriver } from "../notify/ringback.js";
 import logger from "../utils/logger.js";
 
@@ -163,6 +163,16 @@ export async function matchNewOffer(offer, requests) {
     matchIds: matches.map(m => m.id)
   });
   
+  // Update offer status based on allocations
+  if (matches.length > 0) {
+    await updateOfferStatusByAllocations(offer.id);
+    
+    // Update status for each matched request
+    for (const match of matches) {
+      await updateRequestStatusByAllocations(match.request_id);
+    }
+  }
+  
   return matches;
 }
 
@@ -293,6 +303,16 @@ export async function matchNewRequest(request, offers) {
     matchIds: matches.map(m => m.id),
     remainingNeeds: remaining
   });
+  
+  // Update request status based on allocations
+  if (matches.length > 0) {
+    await updateRequestStatusByAllocations(request.id);
+    
+    // Update status for each matched offer
+    for (const match of matches) {
+      await updateOfferStatusByAllocations(match.offer_id);
+    }
+  }
   
   return matches;
 }

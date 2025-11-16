@@ -7,7 +7,8 @@ import {
   getUserByPhone,
   cancelOffer,
   upsertUser,
-  getRequestById
+  getRequestById,
+  getMatchesByOfferId
 } from '../db/repo.js';
 import { collections } from '../db/mongoClient.js';
 import { matchNewOffer } from '../engine/matching.js';
@@ -683,17 +684,34 @@ offerRideRouter.delete('/:id', async (req, res) => {
       });
     }
 
+    // Check for active matches
+    const matches = await getMatchesByOfferId(id);
+    const activeMatches = matches.filter(m => 
+      ['pending', 'notified', 'connected', 'accepted'].includes(m.status)
+    );
+
     // Cancel the offer (sets status to 'cancelled' and updates related matches)
     await cancelOffer(id);
 
     logger.info('Offer cancelled successfully', {
       offerId: id,
-      phone: cleanPhone
+      phone: cleanPhone,
+      activeMatchesCount: activeMatches.length
     });
+
+    // Build response message based on matches
+    let message = 'ההצעה בוטלה בהצלחה';
+    let warning = null;
+    
+    if (activeMatches.length > 0) {
+      warning = `שים לב: היו ${activeMatches.length} התאמות פעילות לנסיעה זו. חשוב להודיע לנוסעים על הביטול! השיבוץ נמחק והנסיעות פתוחות לבקשות אחרות.`;
+    }
 
     res.json({
       success: true,
-      message: 'ההצעה בוטלה בהצלחה'
+      message,
+      warning,
+      affectedMatches: activeMatches.length
     });
 
   } catch (error) {

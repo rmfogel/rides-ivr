@@ -1,5 +1,5 @@
 import express from 'express';
-import { getMatchById, updateMatchStatus } from '../db/repo.js';
+import { getMatchById, updateMatchStatus, updateOfferStatusByAllocations, updateRequestStatusByAllocations } from '../db/repo.js';
 import logger from '../utils/logger.js';
 
 export const matchRouter = express.Router();
@@ -51,6 +51,10 @@ matchRouter.put('/:id/accept', async (req, res) => {
 
     // Update match status to 'accepted'
     await updateMatchStatus(id, 'accepted');
+
+    // Update the status of the related offer and request
+    await updateOfferStatusByAllocations(match.offer_id.toString());
+    await updateRequestStatusByAllocations(match.request_id.toString());
 
     logger.info('Match accepted', {
       matchId: id,
@@ -105,6 +109,10 @@ matchRouter.put('/:id/decline', async (req, res) => {
 
     // Update match status to 'declined'
     await updateMatchStatus(id, 'declined');
+
+    // Update the status of the related offer and request (declined matches shouldn't count)
+    await updateOfferStatusByAllocations(match.offer_id.toString());
+    await updateRequestStatusByAllocations(match.request_id.toString());
 
     logger.info('Match declined', {
       matchId: id,

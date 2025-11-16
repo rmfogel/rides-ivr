@@ -134,6 +134,137 @@ export async function listPendingMatchesForDriverPhone(phone) {
   return list.map(normalize);
 }
 
+/**
+ * Calculate and update the status of an offer based on allocated seats
+ * @param {string} offerId - The offer ID
+ * @returns {Promise<string>} The new status ('active', 'partial', or 'matched')
+ */
+export async function updateOfferStatusByAllocations(offerId) {
+  const { offers, matches } = await collections();
+  
+  logger.debug('Updating offer status based on allocations', { offerId });
+  
+  // Get the offer
+  const offer = await getOfferById(offerId);
+  if (!offer) {
+    logger.warn('Offer not found for status update', { offerId });
+    return null;
+  }
+  
+  // Calculate total available seats
+  const totalSeats = (offer.seats_male_only || 0) + (offer.seats_female_only || 0) + (offer.seats_anygender || 0);
+  
+  // Get all active matches (pending, notified, connected) for this offer
+  const activeMatches = await matches.find({
+    offer_id: oid(offerId),
+    status: { $in: ['pending', 'notified', 'connected', 'accepted'] }
+  }).toArray();
+  
+  // Calculate total allocated seats
+  let allocatedSeats = 0;
+  activeMatches.forEach(match => {
+    allocatedSeats += (match.allocated_male || 0);
+    allocatedSeats += (match.allocated_female || 0);
+    allocatedSeats += (match.allocated_anygender || 0);
+    allocatedSeats += (match.allocated_couples || 0) * 2; // Each couple = 2 seats
+  });
+  
+  // Determine new status
+  let newStatus = 'active';
+  if (allocatedSeats >= totalSeats) {
+    newStatus = 'matched'; // Fully matched
+  } else if (allocatedSeats > 0) {
+    newStatus = 'partial'; // Partially matched
+  }
+  
+  logger.info('Calculated offer status', {
+    offerId,
+    totalSeats,
+    allocatedSeats,
+    activeMatchesCount: activeMatches.length,
+    oldStatus: offer.status,
+    newStatus
+  });
+  
+  // Update the offer status if it changed
+  if (offer.status !== newStatus) {
+    await offers.updateOne(
+      { _id: oid(offerId) },
+      { $set: { status: newStatus, updated_at: new Date() } }
+    );
+    logger.info('Updated offer status', { offerId, from: offer.status, to: newStatus });
+  }
+  
+  return newStatus;
+}
+
+/**
+ * Calculate and update the status of a request based on allocated passengers
+ * @param {string} requestId - The request ID
+ * @returns {Promise<string>} The new status ('open', 'partial', or 'matched')
+ */
+export async function updateRequestStatusByAllocations(requestId) {
+  const { requests, matches } = await collections();
+  
+  logger.debug('Updating request status based on allocations', { requestId });
+  
+  // Get the request
+  const request = await getRequestById(requestId);
+  if (!request) {
+    logger.warn('Request not found for status update', { requestId });
+    return null;
+  }
+  
+  // Calculate total passengers needed
+  const totalPassengers = (request.passengers_male || 0) + 
+                         (request.passengers_female || 0) + 
+                         (request.children_count || 0);
+  
+  // Get all active matches (pending, notified, connected) for this request
+  const activeMatches = await matches.find({
+    request_id: oid(requestId),
+    status: { $in: ['pending', 'notified', 'connected', 'accepted'] }
+  }).toArray();
+  
+  // Calculate total allocated passengers
+  let allocatedPassengers = 0;
+  activeMatches.forEach(match => {
+    allocatedPassengers += (match.allocated_male || 0);
+    allocatedPassengers += (match.allocated_female || 0);
+    allocatedPassengers += (match.allocated_anygender || 0);
+    allocatedPassengers += (match.allocated_couples || 0) * 2; // Each couple = 2 people
+    allocatedPassengers += (match.allocated_children || 0);
+  });
+  
+  // Determine new status
+  let newStatus = 'open';
+  if (allocatedPassengers >= totalPassengers) {
+    newStatus = 'matched'; // Fully matched
+  } else if (allocatedPassengers > 0) {
+    newStatus = 'partial'; // Partially matched
+  }
+  
+  logger.info('Calculated request status', {
+    requestId,
+    totalPassengers,
+    allocatedPassengers,
+    activeMatchesCount: activeMatches.length,
+    oldStatus: request.status,
+    newStatus
+  });
+  
+  // Update the request status if it changed
+  if (request.status !== newStatus) {
+    await requests.updateOne(
+      { _id: oid(requestId) },
+      { $set: { status: newStatus, updated_at: new Date() } }
+    );
+    logger.info('Updated request status', { requestId, from: request.status, to: newStatus });
+  }
+  
+  return newStatus;
+}
+
 export async function isAllowed(phone) {
   if (process.env.ALLOW_ALL_CALLERS === 'true') return true;
   const { users } = await collections();
@@ -279,11 +410,28 @@ export async function cancelOffer(id) {
     { returnDocument: 'after' }
   );
 
-  // Find and update any pending/notified matches
+  // Find all affected matches and their request IDs
+  const affectedMatches = await matches.find(
+    { offer_id: oid(id), status: { $in: ['pending', 'notified', 'accepted'] } }
+  ).toArray();
+  
+  const affectedRequestIds = [...new Set(affectedMatches.map(m => m.request_id.toString()))];
+
+  // Update the matches to cancelled
   await matches.updateMany(
-    { offer_id: oid(id), status: { $in: ['pending', 'notified'] } },
+    { offer_id: oid(id), status: { $in: ['pending', 'notified', 'accepted'] } },
     { $set: { status: 'cancelled', updated_at: new Date() } }
   );
+
+  // Update status of all affected requests
+  logger.info('Updating status of affected requests after offer cancellation', {
+    offerId: id,
+    affectedRequestCount: affectedRequestIds.length
+  });
+  
+  for (const requestId of affectedRequestIds) {
+    await updateRequestStatusByAllocations(requestId);
+  }
 
   return normalize(res.value || res);
 }
@@ -300,11 +448,28 @@ export async function cancelRequest(id) {
     { returnDocument: 'after' }
   );
 
-  // Find and update any pending/notified matches
+  // Find all affected matches and their offer IDs
+  const affectedMatches = await matches.find(
+    { request_id: oid(id), status: { $in: ['pending', 'notified', 'accepted'] } }
+  ).toArray();
+  
+  const affectedOfferIds = [...new Set(affectedMatches.map(m => m.offer_id.toString()))];
+
+  // Update the matches to cancelled
   await matches.updateMany(
-    { request_id: oid(id), status: { $in: ['pending', 'notified'] } },
+    { request_id: oid(id), status: { $in: ['pending', 'notified', 'accepted'] } },
     { $set: { status: 'cancelled', updated_at: new Date() } }
   );
+
+  // Update status of all affected offers
+  logger.info('Updating status of affected offers after request cancellation', {
+    requestId: id,
+    affectedOfferCount: affectedOfferIds.length
+  });
+  
+  for (const offerId of affectedOfferIds) {
+    await updateOfferStatusByAllocations(offerId);
+  }
 
   return normalize(res.value || res);
 }

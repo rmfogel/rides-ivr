@@ -602,7 +602,6 @@
                             ${offer.notes ? `<div style="font-size: 13px; color: #5f6368; margin-top: 8px;">הערות: ${offer.notes}</div>` : ''}
                             <div class="ride-actions">
                                 <button class="btn btn-matches btn-sm" onclick="viewOfferMatches('${offer.id}')">👥 מי נוסע איתי?</button>
-                                <button class="btn btn-secondary btn-sm" onclick="editOffer('${offer.id}')">✏️ ערוך</button>
                                 <button class="btn btn-danger btn-sm" onclick="deleteOffer('${offer.id}')">🗑️ מחק</button>
                             </div>
                         </div>
@@ -658,7 +657,6 @@
                             ${request.notes ? `<div style="font-size: 13px; color: #5f6368; margin-top: 8px;">הערות: ${request.notes}</div>` : ''}
                             <div class="ride-actions">
                                 <button class="btn btn-matches btn-sm" onclick="viewRequestMatches('${request.id}')">� איך אני נוסע?</button>
-                                <button class="btn btn-secondary btn-sm" onclick="editRequest('${request.id}')">✏️ ערוך</button>
                                 <button class="btn btn-danger btn-sm" onclick="deleteRequest('${request.id}')">🗑️ מחק</button>
                             </div>
                         </div>
@@ -769,7 +767,16 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    // Show success message
                     showSuccess(data.message || 'ההצעה נמחקה בהצלחה');
+                    
+                    // If there were active matches, show warning
+                    if (data.warning) {
+                        setTimeout(() => {
+                            alert('⚠️ ' + data.warning);
+                        }, 500);
+                    }
+                    
                     loadRides(); // Reload the list
                 } else {
                     showError(data.error || 'שגיאה במחיקת ההצעה');
@@ -800,7 +807,16 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    // Show success message
                     showSuccess(data.message || 'הבקשה נמחקה בהצלחה');
+                    
+                    // If there were active matches, show warning
+                    if (data.warning) {
+                        setTimeout(() => {
+                            alert('⚠️ ' + data.warning);
+                        }, 500);
+                    }
+                    
                     loadRides(); // Reload the list
                 } else {
                     showError(data.error || 'שגיאה במחיקת הבקשה');
