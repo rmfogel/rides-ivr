@@ -325,6 +325,9 @@ requestRideRouter.post('/', async (req, res) => {
         const offer = await getOfferById(match.offer_id);
         if (!offer) return null;
         
+        // Get user info for name recording
+        const driverUser = await getUserByPhone(offer.driver_phone);
+        
         const departureDateTime = DateTime.fromJSDate(offer.departure_time).setZone(TZ);
         
         return {
@@ -337,7 +340,8 @@ requestRideRouter.post('/', async (req, res) => {
           offer: {
             id: offer.id,
             driver_phone: offer.driver_phone,
-            driver_name: offer.driver_name,
+            driver_name: offer.driver_name || driverUser?.name || 'לא צוין',
+            driver_name_recording_url: driverUser?.name_recording_url || null,
             direction: offer.direction,
             date: departureDateTime.toFormat('dd/MM/yyyy'),
             departureTime: departureDateTime.toFormat('HH:mm'),

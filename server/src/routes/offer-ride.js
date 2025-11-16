@@ -243,6 +243,9 @@ offerRideRouter.post('/', async (req, res) => {
         const request = await getRequestById(match.request_id);
         if (!request) return null;
         
+        // Get user info for name recording
+        const riderUser = await getUserByPhone(request.rider_phone);
+        
         const earliestDateTime = DateTime.fromJSDate(request.earliest_time).setZone(TZ);
         const latestDateTime = DateTime.fromJSDate(request.latest_time).setZone(TZ);
         const preferredDateTime = request.preferred_time ? DateTime.fromJSDate(request.preferred_time).setZone(TZ) : null;
@@ -257,16 +260,17 @@ offerRideRouter.post('/', async (req, res) => {
           request: {
             id: request.id,
             rider_phone: request.rider_phone,
-            rider_name: request.rider_name,
+            rider_name: request.rider_name || riderUser?.name || 'לא צוין',
+            rider_name_recording_url: riderUser?.name_recording_url || null,
             direction: request.direction,
             date: earliestDateTime.toFormat('dd/MM/yyyy'),
             earliestTime: earliestDateTime.toFormat('HH:mm'),
             latestTime: latestDateTime.toFormat('HH:mm'),
             preferredTime: preferredDateTime ? preferredDateTime.toFormat('HH:mm') : null,
-            maleCount: request.maleCount,
-            femaleCount: request.femaleCount,
-            childrenCount: request.childrenCount,
-            couplesCount: request.couplesCount,
+            maleCount: request.passengers_male || 0,
+            femaleCount: request.passengers_female || 0,
+            childrenCount: request.children_count || 0,
+            couplesCount: request.couples_count || 0,
             totalPassengers: request.passengers_total || 0,
             together: request.together,
             notes: request.notes

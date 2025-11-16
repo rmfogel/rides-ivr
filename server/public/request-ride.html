@@ -1059,6 +1059,7 @@
                 const offer = match.offer;
                 const driverName = offer.driver_name || 'לא צוין';
                 const driverPhone = offer.driver_phone || '';
+                const hasRecording = offer.driver_name_recording_url ? true : false;
                 
                 // Format date
                 const dateObj = new Date(offer.date);
@@ -1070,7 +1071,10 @@
                 });
                 
                 // Format time
-                const departureTime = offer.time || 'לא צוין';
+                const departureTime = offer.departureTime || 'לא צוין';
+                
+                // Calculate total allocated (including couples as 2 people each)
+                const totalAllocated = (match.allocated_male || 0) + (match.allocated_female || 0) + (match.allocated_anygender || 0) + ((match.allocated_couples || 0) * 2);
                 
                 return `
                     <div class="match-card" id="match-${match.matchId}">
@@ -1080,7 +1084,10 @@
                         <div class="match-info">
                             <div class="match-info-item">
                                 <div class="match-info-label">שם הנהג</div>
-                                <div class="match-info-value">${driverName}</div>
+                                <div class="match-info-value">
+                                    ${driverName}
+                                    ${hasRecording ? `<button onclick="playRecording('${offer.driver_name_recording_url}')" style="margin-right: 8px; padding: 4px 8px; background-color: #673ab7; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">🔊 האזן</button>` : ''}
+                                </div>
                             </div>
                             <div class="match-info-item">
                                 <div class="match-info-label">טלפון</div>
@@ -1095,13 +1102,13 @@
                                 <div class="match-info-value">${departureTime}</div>
                             </div>
                             <div class="match-info-item">
-                                <div class="match-info-label">מקומות פנויים</div>
-                                <div class="match-info-value">${offer.seats || 0}</div>
+                                <div class="match-info-label">מקומות פנויים בהצעה</div>
+                                <div class="match-info-value">${offer.totalSeats || 0}</div>
                             </div>
                             <div class="match-info-item">
-                                <div class="match-info-label">מקומות מוקצים</div>
+                                <div class="match-info-label">מקומות מוקצים לך</div>
                                 <div class="match-info-value">
-                                    ${match.allocated_seats || 0} (גברים: ${match.allocated_male || 0}, נשים: ${match.allocated_female || 0})
+                                    ${totalAllocated} (גברים: ${match.allocated_male || 0}, נשים: ${match.allocated_female || 0}, כללי: ${match.allocated_anygender || 0}${match.allocated_couples > 0 ? `, זוגות: ${match.allocated_couples}` : ''})
                                 </div>
                             </div>
                         </div>
@@ -1213,6 +1220,20 @@
                 alert('אירעה שגיאה בדחיית ההתאמה. אנא נסה שוב.');
                 buttons.forEach(btn => btn.disabled = false);
             }
+        }
+
+        // Play name recording
+        function playRecording(url) {
+            if (!url) {
+                alert('אין הקלטה זמינה');
+                return;
+            }
+            
+            const audio = new Audio(url);
+            audio.play().catch(error => {
+                console.error('Error playing audio:', error);
+                alert('שגיאה בהשמעת ההקלטה');
+            });
         }
 
         // Close modal on outside click

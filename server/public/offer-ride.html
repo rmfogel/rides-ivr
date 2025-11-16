@@ -924,6 +924,7 @@
                 const request = match.request;
                 const riderName = request.rider_name || 'לא צוין';
                 const riderPhone = request.rider_phone || '';
+                const hasRecording = request.rider_name_recording_url ? true : false;
                 
                 // Format date
                 const dateObj = new Date(request.date);
@@ -942,6 +943,12 @@
                     ? `${earliestTime} - ${latestTime} (מועדף: ${preferredTime})`
                     : `${earliestTime} - ${latestTime}`;
                 
+                // Calculate total passengers
+                const totalPassengers = (request.maleCount || 0) + (request.femaleCount || 0) + (request.childrenCount || 0);
+                
+                // Calculate total allocated (including couples as 2 people each)
+                const totalAllocated = (match.allocated_male || 0) + (match.allocated_female || 0) + (match.allocated_anygender || 0) + ((match.allocated_couples || 0) * 2);
+                
                 return `
                     <div class="match-card" id="match-${match.matchId}">
                         <div class="match-card-header">
@@ -949,8 +956,11 @@
                         </div>
                         <div class="match-info">
                             <div class="match-info-item">
-                                <div class="match-info-label">שם הרוכב</div>
-                                <div class="match-info-value">${riderName}</div>
+                                <div class="match-info-label">שם הנוסע</div>
+                                <div class="match-info-value">
+                                    ${riderName}
+                                    ${hasRecording ? `<button onclick="playRecording('${request.rider_name_recording_url}')" style="margin-right: 8px; padding: 4px 8px; background-color: #673ab7; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">🔊 האזן</button>` : ''}
+                                </div>
                             </div>
                             <div class="match-info-item">
                                 <div class="match-info-label">טלפון</div>
@@ -965,13 +975,13 @@
                                 <div class="match-info-value">${timeDisplay}</div>
                             </div>
                             <div class="match-info-item">
-                                <div class="match-info-label">מספר נוסעים</div>
-                                <div class="match-info-value">${request.passengers || 1}</div>
+                                <div class="match-info-label">נוסעים (סה"כ)</div>
+                                <div class="match-info-value">${totalPassengers} (גברים: ${request.maleCount || 0}, נשים: ${request.femaleCount || 0}${request.childrenCount > 0 ? `, ילדים: ${request.childrenCount}` : ''})</div>
                             </div>
                             <div class="match-info-item">
                                 <div class="match-info-label">מקומות מוקצים</div>
                                 <div class="match-info-value">
-                                    ${match.allocated_seats || 0} (גברים: ${match.allocated_male || 0}, נשים: ${match.allocated_female || 0})
+                                    ${totalAllocated} (גברים: ${match.allocated_male || 0}, נשים: ${match.allocated_female || 0}, כללי: ${match.allocated_anygender || 0}${match.allocated_couples > 0 ? `, זוגות: ${match.allocated_couples}` : ''})
                                 </div>
                             </div>
                         </div>
@@ -1083,6 +1093,20 @@
                 alert('אירעה שגיאה בדחיית ההתאמה. אנא נסה שוב.');
                 buttons.forEach(btn => btn.disabled = false);
             }
+        }
+
+        // Play name recording
+        function playRecording(url) {
+            if (!url) {
+                alert('אין הקלטה זמינה');
+                return;
+            }
+            
+            const audio = new Audio(url);
+            audio.play().catch(error => {
+                console.error('Error playing audio:', error);
+                alert('שגיאה בהשמעת ההקלטה');
+            });
         }
 
         // Close modal on outside click
