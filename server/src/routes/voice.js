@@ -1004,9 +1004,12 @@ voiceRouter.post('/rider-confirm', (req, res) => {
   
   // Time range - play earliest to latest
   if (earliest) {
-    const earliestStr = earliest.replace(':', '');
+    // Ensure HH:MM format before removing colon (e.g., '1:30' -> '01:30' -> '0130')
+    const [earlyH, earlyM] = earliest.split(':');
+    const earliestStr = earlyH.padStart(2, '0') + earlyM.padStart(2, '0');
     playHHMM(twiml, earliestStr);
-    const latestStr = latest.replace(':', '');
+    const [lateH, lateM] = latest.split(':');
+    const latestStr = lateH.padStart(2, '0') + lateM.padStart(2, '0');
     playHHMM(twiml, latestStr);
   }
   
@@ -1723,7 +1726,9 @@ voiceRouter.post('/driver-confirm', (req, res) => {
   
   // Time - play the departure time
   if (time) {
-    const timeStr = time.replace(':', '');
+    // Ensure HH:MM format before removing colon (e.g., '1:30' -> '01:30' -> '0130')
+    const [h, m] = time.split(':');
+    const timeStr = h.padStart(2, '0') + m.padStart(2, '0');
     playHHMM(twiml, timeStr);
   }
   

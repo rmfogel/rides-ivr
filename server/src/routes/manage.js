@@ -75,6 +75,8 @@ manageRouter.post('/menu', async (req, res) => {
       playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (totalRides === 1) {
+      // Only one ride - play intro message and go straight to asking if they want to delete it
+      playPrompt(twiml, 'manage_menu');
       // Only one ride - go straight to asking if they want to delete it
       const ride = offers.length > 0 ? offers[0] : requests[0];
       const isOffer = offers.length > 0;
@@ -96,13 +98,16 @@ manageRouter.post('/menu', async (req, res) => {
       playPrompt(twiml, 'thanks_goodbye');
       twiml.hangup();
     } else if (offers.length > 0 && requests.length === 0) {
-      // Multiple driver rides only
+      // Multiple driver rides only - play intro message
+      playPrompt(twiml, 'manage_menu');
       twiml.redirect(`/voice/manage/list-rides?type=offer&index=0&phone=${encodeURIComponent(phone)}`);
     } else if (requests.length > 0 && offers.length === 0) {
-      // Multiple rider rides only
+      // Multiple rider rides only - play intro message
+      playPrompt(twiml, 'manage_menu');
       twiml.redirect(`/voice/manage/list-rides?type=request&index=0&phone=${encodeURIComponent(phone)}`);
     } else {
-      // Both types - ask which to manage
+      // Both types - play intro message and ask which to manage
+      playPrompt(twiml, 'manage_menu');
       const gather = twiml.gather({
         input: 'dtmf',
         numDigits: 1,
