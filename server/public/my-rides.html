@@ -887,17 +887,9 @@
                         'declined': 'נדחה'
                     };
                     
-                    // Check if match is in the past
-                    let isPast = false;
-                    if (type === 'offer') {
-                        // For offers, check the request's latest time
-                        isPast = isPastRequest(matchData.date, matchData.latestTime);
-                    } else {
-                        // For requests, check the offer's departure time
-                        isPast = isPastRide(matchData.date, matchData.departureTime);
-                    }
-                    
-                    const matchItemClass = isPast ? 'match-item past-match' : 'match-item';
+                    // All displayed matches are current (server filters out old ones)
+                    // No need to check isPast since we only show today's and future rides
+                    const matchItemClass = 'match-item';
                     
                     if (type === 'offer') {
                         // Showing request details for an offer
