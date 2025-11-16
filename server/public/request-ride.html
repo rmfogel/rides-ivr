@@ -1059,16 +1059,26 @@
                 const offer = match.offer;
                 const driverName = offer.driver_name || 'לא צוין';
                 const driverPhone = offer.driver_phone || '';
-                const hasRecording = offer.driver_name_recording_url ? true : false;
                 
-                // Format date
-                const dateObj = new Date(offer.date);
-                const formattedDate = dateObj.toLocaleDateString('he-IL', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                });
+                // Format date - parse DD/MM/YYYY format
+                let formattedDate = offer.date || 'לא צוין';
+                try {
+                    const dateParts = offer.date.split('/');
+                    if (dateParts.length === 3) {
+                        const day = dateParts[0];
+                        const month = dateParts[1];
+                        const year = dateParts[2];
+                        const dateObj = new Date(year, month - 1, day);
+                        formattedDate = dateObj.toLocaleDateString('he-IL', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error parsing date:', e);
+                }
                 
                 // Format time
                 const departureTime = offer.departureTime || 'לא צוין';
@@ -1084,10 +1094,7 @@
                         <div class="match-info">
                             <div class="match-info-item">
                                 <div class="match-info-label">שם הנהג</div>
-                                <div class="match-info-value">
-                                    ${driverName}
-                                    ${hasRecording ? `<button onclick="playRecording('${offer.driver_name_recording_url}')" style="margin-right: 8px; padding: 4px 8px; background-color: #673ab7; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">🔊 האזן</button>` : ''}
-                                </div>
+                                <div class="match-info-value">${driverName}</div>
                             </div>
                             <div class="match-info-item">
                                 <div class="match-info-label">טלפון</div>
@@ -1220,20 +1227,6 @@
                 alert('אירעה שגיאה בדחיית ההתאמה. אנא נסה שוב.');
                 buttons.forEach(btn => btn.disabled = false);
             }
-        }
-
-        // Play name recording
-        function playRecording(url) {
-            if (!url) {
-                alert('אין הקלטה זמינה');
-                return;
-            }
-            
-            const audio = new Audio(url);
-            audio.play().catch(error => {
-                console.error('Error playing audio:', error);
-                alert('שגיאה בהשמעת ההקלטה');
-            });
         }
 
         // Close modal on outside click
